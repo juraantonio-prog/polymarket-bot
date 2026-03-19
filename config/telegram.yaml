@@ -1,0 +1,35 @@
+# Telegram alert configuration
+alerts:
+  enabled: true
+  # Minimum confidence to send alert
+  min_confidence_for_alert: 0.60
+  # Rate limit: max alerts per hour
+  max_alerts_per_hour: 20
+  # Message templates use Python .format() syntax
+  templates:
+    signal: |
+      🎯 *SIGNAL: {market_name}*
+      Direction: {direction}
+      Entry Price: {entry_price:.4f}
+      Confidence: {confidence:.2%}
+      Days to Expiry: {days_to_expiry}
+      Volume Spike: {volume_spike:.1f}x
+      Mode: {mode}
+    position_open: |
+      📈 *POSITION OPENED*
+      Market: {market_name}
+      Size: ${size_usd:.2f}
+      Entry: {entry_price:.4f}
+      TP: {tp_price:.4f} | SL: {sl_price:.4f}
+    position_closed: |
+      📊 *POSITION CLOSED*
+      Market: {market_name}
+      PnL: ${pnl_usd:+.2f} ({pnl_pct:+.2%})
+      Reason: {reason}
+    daily_report: |
+      📋 *DAILY REPORT*
+      Date: {date}
+      Trades: {total_trades}
+      Win Rate: {win_rate:.1%}
+      PnL: ${total_pnl:+.2f}
+      Avg Latency: {avg_latency_ms:.0f}ms

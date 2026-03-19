@@ -1,0 +1,43 @@
+# Spike-fade strategy parameters
+spike_fade:
+  # Minimum price spike to trigger signal (fractional, e.g. 0.05 = 5%)
+  min_spike_magnitude: 0.05
+  # Lookback window for baseline price (seconds)
+  baseline_window_seconds: 600
+  # Volume spike multiplier vs rolling average required
+  volume_spike_multiplier: 2.0
+  # Minimum absolute volume in USD for signal
+  min_volume_usd: 5000
+
+# Confidence scoring weights (must sum to 1.0)
+confidence:
+  weights:
+    spike_magnitude: 0.35
+    volume_confirmation: 0.30
+    liquidity_score: 0.20
+    time_of_day: 0.15
+  # Minimum confidence to open position
+  min_threshold: 0.55
+  # All sub-scores normalized to [0.0, 1.0]
+
+# Time-to-expiry filter
+expiry:
+  min_days_to_expiry: 30
+
+# Market filtering
+filters:
+  # Minimum bid-ask spread tolerance (fractional)
+  max_spread: 0.10
+  # Minimum orderbook depth (USD)
+  min_orderbook_depth_usd: 1000
+  # Only trade YES/NO binary markets
+  binary_only: true
+
+# Execution
+execution:
+  slippage_bps: 100
+  take_profit_delta: 0.06
+  stop_loss_delta: 0.04
+  time_stop_seconds: 2400
+  max_position_size_usd: 500
+  max_open_positions: 5

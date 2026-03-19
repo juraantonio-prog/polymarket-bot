@@ -1,0 +1,40 @@
+# API endpoints - all URLs must come from config, never hardcoded
+api:
+  gamma_base_url: "https://gamma-api.polymarket.com"
+  clob_base_url: "https://clob.polymarket.com"
+  ws_url: "wss://ws-subscriptions-clob.polymarket.com/ws/market"
+
+# Database
+db:
+  path: "data/polymarket.db"
+
+# Rate limiter
+rate_limiter:
+  orders_per_minute: 60
+  backoff_base_seconds: 1.0
+  backoff_max_seconds: 60.0
+  backoff_multiplier: 2.0
+
+# Market discovery
+discovery:
+  poll_interval_seconds: 300
+  max_markets_per_poll: 100
+  min_volume_usd: 10000
+
+# Price tracking
+price_tracker:
+  window_seconds: 3600
+  tick_interval_seconds: 10
+  max_ticks_in_memory: 360
+
+# WebSocket
+websocket:
+  ping_interval_seconds: 30
+  reconnect_delay_seconds: 5
+  max_reconnect_attempts: 10
+
+# Logging
+logging:
+  level: "INFO"
+  format: "json"
+  file: "logs/polymarket.log"
