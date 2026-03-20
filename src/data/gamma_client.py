@@ -23,6 +23,9 @@ class GammaClient:
         self._base = config.gamma_base_url
         self._min_volume = config.get("discovery", "min_volume_usd", default=10000)
         self._max_markets = config.get("discovery", "max_markets_per_poll", default=100)
+        self._allowed_categories: set[str] = {
+            c.lower() for c in config.get("filters", "allowed_categories", default=[])
+        }
         self._client: httpx.AsyncClient | None = None
 
     async def __aenter__(self) -> "GammaClient":
@@ -77,10 +80,12 @@ class GammaClient:
 
     async def discover_markets(self, min_volume: float | None = None) -> list[dict[str, Any]]:
         """
-        Full discovery pass: fetch markets and filter by volume + binary type.
+        Full discovery pass: fetch markets and filter by volume, binary type, and category.
+        Only markets tagged with an allowed category (politics, geopolitics, macro) are returned.
         """
         raw = await self.get_markets()
         threshold = min_volume if min_volume is not None else self._min_volume
+        allowed = self._allowed_categories
         filtered = []
         for m in raw:
             # Skip closed markets
@@ -101,6 +106,26 @@ class GammaClient:
             vol = float(m.get("volumeNum", m.get("volume", 0)) or 0)
             if vol < threshold:
                 continue
+
+            # Reject markets not in the allowed category list
+            if allowed:
+                tags = m.get("tags", [])
+                # tags may be a list of dicts {"label": "Politics", ...} or plain strings
+                tag_labels = {
+                    (t.get("label", t) if isinstance(t, dict) else t).lower()
+                    for t in tags
+                }
+                # Also check top-level category field
+                top_category = (m.get("category") or "").lower()
+                if top_category:
+                    tag_labels.add(top_category)
+                if not tag_labels.intersection(allowed):
+                    log.debug(
+                        "gamma.market_rejected_category",
+                        market=m.get("question", m.get("id", "?")),
+                        tags=list(tag_labels),
+                    )
+                    continue
 
             filtered.append(m)
         log.info("gamma.discovery_complete", total=len(raw), filtered=len(filtered))

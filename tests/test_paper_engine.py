@@ -18,9 +18,9 @@ def _make_config():
             "take_profit_delta": 0.06,
             "stop_loss_delta": 0.04,
             "time_stop_seconds": 2400,
-            "max_position_size_usd": 500,
             "max_open_positions": 5,
-        }
+        },
+        ("risk", "notional_per_trade_usd"): 100,
     }.get(keys, kw.get("default", {}))
     return cfg
 
@@ -58,7 +58,7 @@ async def test_try_open_returns_none_below_threshold():
     engine._tp_delta = 0.06
     engine._sl_delta = 0.04
     engine._time_stop_sec = 2400
-    engine._max_size_usd = 500
+    engine._notional_usd = 100
     engine._max_open = 5
     tracker = AsyncMock()
     tracker.count_open = AsyncMock(return_value=0)
@@ -80,7 +80,7 @@ async def test_try_open_respects_max_positions():
     engine._tp_delta = 0.06
     engine._sl_delta = 0.04
     engine._time_stop_sec = 2400
-    engine._max_size_usd = 500
+    engine._notional_usd = 100
     engine._max_open = 5
     tracker = AsyncMock()
     tracker.count_open = AsyncMock(return_value=5)  # at max
@@ -100,7 +100,7 @@ async def test_slippage_applied_fade_yes():
     engine._tp_delta = 0.06
     engine._sl_delta = 0.04
     engine._time_stop_sec = 2400
-    engine._max_size_usd = 500
+    engine._notional_usd = 100
     engine._max_open = 5
     tracker = AsyncMock()
     tracker.count_open = AsyncMock(return_value=0)

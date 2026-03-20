@@ -33,8 +33,8 @@ class PaperEngine:
         self._tp_delta = float(ex.get("take_profit_delta", 0.06))
         self._sl_delta = float(ex.get("stop_loss_delta", 0.04))
         self._time_stop_sec = int(ex.get("time_stop_seconds", 2400))
-        self._max_size_usd = float(ex.get("max_position_size_usd", 500))
         self._max_open = int(ex.get("max_open_positions", 5))
+        self._notional_usd = float(config.get("risk", "notional_per_trade_usd", default=100))
         self._tracker = PositionTracker(db)
         self._db = db
 
@@ -72,7 +72,7 @@ class PaperEngine:
         tp = max(0.01, min(0.99, tp))
         sl = max(0.01, min(0.99, sl))
 
-        size_usd = self._max_size_usd * confidence.total
+        size_usd = self._notional_usd
         time_stop_at = datetime.now(tz=timezone.utc) + timedelta(seconds=self._time_stop_sec)
 
         position = await self._tracker.open_position(

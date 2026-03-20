@@ -1,0 +1,6 @@
+# Risk management parameters
+risk:
+  # Fixed notional per trade in USD — paper engine uses this exactly, no confidence scaling
+  notional_per_trade_usd: 100
+  # Maximum total open exposure across all positions (USD)
+  max_total_exposure_usd: 500

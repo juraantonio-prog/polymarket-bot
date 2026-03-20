@@ -36,7 +36,7 @@ class Config:
     def __init__(self, config_dir: Path | None = None):
         base = config_dir or _CONFIG_DIR
         self._data: dict[str, Any] = {}
-        for fname in ("settings.yaml", "strategy.yaml", "telegram.yaml"):
+        for fname in ("settings.yaml", "strategy.yaml", "telegram.yaml", "risk.yaml"):
             fpath = base / fname
             if fpath.exists():
                 self._data = _deep_merge(self._data, _load_yaml(fpath))

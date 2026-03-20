@@ -32,6 +32,11 @@ filters:
   min_orderbook_depth_usd: 1000
   # Only trade YES/NO binary markets
   binary_only: true
+  # Allowed market categories (lowercase). Markets not matching any tag are rejected.
+  allowed_categories:
+    - politics
+    - geopolitics
+    - macro
 
 # Execution
 execution:
