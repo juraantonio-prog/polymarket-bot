@@ -291,7 +291,23 @@ def run_bot(ctx: click.Context, mode: str) -> None:
                             reason=cp.close_reason or "",
                         )
 
-            await asyncio.gather(ws.start(), exit_loop())
+            # Background: send daily report at 13:00 UTC
+            async def daily_report_loop() -> None:
+                from src.analytics.daily_report import DailyReporter
+                reporter = DailyReporter(db, alerter)
+                last_sent: datetime.date | None = None
+                while True:
+                    await asyncio.sleep(60)
+                    now = datetime.datetime.now(tz=datetime.timezone.utc)
+                    if now.hour == 13 and now.minute == 0 and last_sent != now.date():
+                        try:
+                            await reporter.run()
+                            last_sent = now.date()
+                            log.info("daily_report_sent")
+                        except Exception as exc:
+                            log.error("daily_report_error", error=str(exc))
+
+            await asyncio.gather(ws.start(), exit_loop(), daily_report_loop())
 
     try:
         _run(_run_paper())
