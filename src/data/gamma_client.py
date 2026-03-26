@@ -21,11 +21,17 @@ class GammaClient:
 
     def __init__(self, config: Config) -> None:
         self._base = config.gamma_base_url
-        self._min_volume = config.get("discovery", "min_volume_usd", default=10000)
+        self._min_volume = config.get("discovery", "min_volume_usd", default=500_000)
         self._max_markets = config.get("discovery", "max_markets_per_poll", default=100)
         self._allowed_categories: set[str] = {
             c.lower() for c in config.get("filters", "allowed_categories", default=[])
         }
+        self._blocked_categories: set[str] = {
+            c.lower() for c in config.get("filters", "blocked_categories", default=[])
+        }
+        overrides = config.get("market_overrides", default={})
+        self._whitelist: set[str] = set(overrides.get("whitelist") or [])
+        self._blacklist: set[str] = set(overrides.get("blacklist") or [])
         self._client: httpx.AsyncClient | None = None
 
     async def __aenter__(self) -> "GammaClient":
@@ -81,15 +87,39 @@ class GammaClient:
     async def discover_markets(self, min_volume: float | None = None) -> list[dict[str, Any]]:
         """
         Full discovery pass: fetch markets and filter by volume, binary type, and category.
-        Only markets tagged with an allowed category (politics, geopolitics, macro) are returned.
+        Logs the exact rejection reason for every market to aid debugging.
         """
         raw = await self.get_markets()
         threshold = min_volume if min_volume is not None else self._min_volume
         allowed = self._allowed_categories
+        blocked = self._blocked_categories
+        whitelist = self._whitelist
+        blacklist = self._blacklist
+
         filtered = []
+        rejection_counts: dict[str, int] = {}
+
         for m in raw:
+            name = m.get("question", m.get("title", m.get("id", "?")))
+
+            # Whitelist bypasses all filters
+            mid = m.get("conditionId", m.get("id", ""))
+            if whitelist and mid in whitelist:
+                filtered.append(m)
+                continue
+
+            # Blacklist always rejects
+            if blacklist and mid in blacklist:
+                reason = "blacklisted"
+                rejection_counts[reason] = rejection_counts.get(reason, 0) + 1
+                log.debug("gamma.market_rejected", reason=reason, market=name[:60])
+                continue
+
             # Skip closed markets
             if m.get("closed", False):
+                reason = "closed"
+                rejection_counts[reason] = rejection_counts.get(reason, 0) + 1
+                log.debug("gamma.market_rejected", reason=reason, market=name[:60])
                 continue
 
             # Accept only binary (YES/NO) markets — clobTokenIds is a JSON string
@@ -101,32 +131,49 @@ class GammaClient:
                 except Exception:
                     clob_ids = []
             if len(clob_ids) != 2:
+                reason = f"not_binary(tokens={len(clob_ids)})"
+                rejection_counts[reason] = rejection_counts.get(reason, 0) + 1
+                log.debug("gamma.market_rejected", reason=reason, market=name[:60])
                 continue
 
             vol = float(m.get("volumeNum", m.get("volume", 0)) or 0)
             if vol < threshold:
+                reason = f"low_volume(${vol:,.0f}<${threshold:,.0f})"
+                rejection_counts[reason] = rejection_counts.get(reason, 0) + 1
+                log.debug("gamma.market_rejected", reason=reason, market=name[:60])
                 continue
 
-            # Reject markets not in the allowed category list
-            if allowed:
-                tags = m.get("tags", [])
-                # tags may be a list of dicts {"label": "Politics", ...} or plain strings
-                tag_labels = {
-                    (t.get("label", t) if isinstance(t, dict) else t).lower()
-                    for t in tags
-                }
-                # Also check top-level category field
-                top_category = (m.get("category") or "").lower()
-                if top_category:
-                    tag_labels.add(top_category)
-                if not tag_labels.intersection(allowed):
-                    log.debug(
-                        "gamma.market_rejected_category",
-                        market=m.get("question", m.get("id", "?")),
-                        tags=list(tag_labels),
-                    )
-                    continue
+            # Collect market tags for category checks
+            tags = m.get("tags", [])
+            tag_labels = {
+                (t.get("label", t) if isinstance(t, dict) else t).lower()
+                for t in tags
+            }
+            top_category = (m.get("category") or "").lower()
+            if top_category:
+                tag_labels.add(top_category)
+
+            # Reject if category is explicitly blocked
+            if blocked and tag_labels.intersection(blocked):
+                bad = tag_labels.intersection(blocked)
+                reason = f"blocked_category({','.join(bad)})"
+                rejection_counts[reason] = rejection_counts.get(reason, 0) + 1
+                log.debug("gamma.market_rejected", reason=reason, market=name[:60])
+                continue
+
+            # Reject if not in the allowed category list (only when list is non-empty)
+            if allowed and not tag_labels.intersection(allowed):
+                reason = f"no_allowed_category(tags={sorted(tag_labels) or ['<none>']})"
+                rejection_counts[reason] = rejection_counts.get(reason, 0) + 1
+                log.debug("gamma.market_rejected", reason=reason, market=name[:60])
+                continue
 
             filtered.append(m)
-        log.info("gamma.discovery_complete", total=len(raw), filtered=len(filtered))
+
+        log.info(
+            "gamma.discovery_complete",
+            total=len(raw),
+            filtered=len(filtered),
+            rejection_summary=rejection_counts,
+        )
         return filtered

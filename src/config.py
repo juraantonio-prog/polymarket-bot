@@ -1,6 +1,7 @@
 """Configuration loader — reads YAML files, merges with env vars."""
 from __future__ import annotations
 
+import logging
 import os
 from pathlib import Path
 from typing import Any
@@ -11,6 +12,12 @@ from dotenv import load_dotenv
 load_dotenv()
 
 _CONFIG_DIR = Path(__file__).parent.parent / "config"
+_logger = logging.getLogger(__name__)
+
+# Required files — bot will not start if any are missing.
+_REQUIRED_FILES = ("settings.yaml", "strategy.yaml", "telegram.yaml", "risk.yaml")
+# Optional files — missing file logs a warning but does not block startup.
+_OPTIONAL_FILES = ("markets.yaml",)
 
 
 def _deep_merge(base: dict, override: dict) -> dict:
@@ -36,10 +43,21 @@ class Config:
     def __init__(self, config_dir: Path | None = None):
         base = config_dir or _CONFIG_DIR
         self._data: dict[str, Any] = {}
-        for fname in ("settings.yaml", "strategy.yaml", "telegram.yaml", "risk.yaml"):
+        for fname in _REQUIRED_FILES:
             fpath = base / fname
             if fpath.exists():
                 self._data = _deep_merge(self._data, _load_yaml(fpath))
+        for fname in _OPTIONAL_FILES:
+            fpath = base / fname
+            if fpath.exists():
+                self._data = _deep_merge(self._data, _load_yaml(fpath))
+            else:
+                _logger.warning(
+                    "Optional config file not found — using defaults: %s "
+                    "(create config/%s to customise market filters)",
+                    fpath,
+                    fname,
+                )
 
         # Env overrides
         if level := os.getenv("LOG_LEVEL"):

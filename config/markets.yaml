@@ -1,0 +1,60 @@
+# Market discovery and filtering rules
+# This file is optional — if missing, filters fall back to strategy.yaml defaults.
+# Loaded AFTER strategy.yaml so keys here OVERRIDE strategy.yaml equivalents.
+
+# Paper-trading phase: lower volume threshold so more markets are trackable.
+discovery:
+  min_volume_usd: 500000   # was 1–5M; $500k still ensures real liquidity
+
+# Broader category allow-list. Strategy.yaml has only [politics, geopolitics, macro]
+# which was eliminating every market. Listed categories cover Polymarket's actual tags.
+filters:
+  allowed_categories:
+    - politics
+    - geopolitics
+    - macro
+    - crypto
+    - cryptocurrency
+    - science
+    - technology
+    - tech
+    - entertainment
+    - culture
+    - business
+    - finance
+    - economics
+    - world
+    - news
+    - law
+    - legal
+    - climate
+    - health
+    - ai
+    - other
+
+  # Markets whose tags intersect this list are ALWAYS rejected, regardless of
+  # allowed_categories above. Applied AFTER the allow-list check.
+  blocked_categories:
+    - sports
+    - nfl
+    - nba
+    - mlb
+    - nhl
+    - soccer
+    - football
+    - basketball
+    - baseball
+    - tennis
+    - golf
+    - mma
+    - boxing
+    - hockey
+    - racing
+    - esports
+
+# Per-market overrides (use Polymarket conditionId)
+market_overrides:
+  # Always include — bypasses ALL filters (volume, category, expiry)
+  whitelist: []
+  # Always exclude
+  blacklist: []
