@@ -153,20 +153,24 @@ class GammaClient:
             if top_category:
                 tag_labels.add(top_category)
 
-            # Reject if category is explicitly blocked
-            if blocked and tag_labels.intersection(blocked):
-                bad = tag_labels.intersection(blocked)
-                reason = f"blocked_category({','.join(bad)})"
-                rejection_counts[reason] = rejection_counts.get(reason, 0) + 1
-                log.debug("gamma.market_rejected", reason=reason, market=name[:60])
-                continue
+            if not tag_labels:
+                # Market has no tags — pass it through, let volume/expiry filters decide.
+                log.debug("gamma.market_untagged", market=name[:60])
+            else:
+                # Reject if category is explicitly blocked
+                if blocked and tag_labels.intersection(blocked):
+                    bad = tag_labels.intersection(blocked)
+                    reason = f"blocked_category({','.join(bad)})"
+                    rejection_counts[reason] = rejection_counts.get(reason, 0) + 1
+                    log.debug("gamma.market_rejected", reason=reason, market=name[:60])
+                    continue
 
-            # Reject if not in the allowed category list (only when list is non-empty)
-            if allowed and not tag_labels.intersection(allowed):
-                reason = f"no_allowed_category(tags={sorted(tag_labels) or ['<none>']})"
-                rejection_counts[reason] = rejection_counts.get(reason, 0) + 1
-                log.debug("gamma.market_rejected", reason=reason, market=name[:60])
-                continue
+                # Reject if not in the allowed category list (only when list is non-empty)
+                if allowed and not tag_labels.intersection(allowed):
+                    reason = f"no_allowed_category(tags={sorted(tag_labels)})"
+                    rejection_counts[reason] = rejection_counts.get(reason, 0) + 1
+                    log.debug("gamma.market_rejected", reason=reason, market=name[:60])
+                    continue
 
             filtered.append(m)
 
