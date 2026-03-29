@@ -57,6 +57,7 @@ class WSClient:
                     attempt = 0
                     await self._send_subscriptions(ws)
                     async for raw in ws:
+                        log.debug("ws.raw_message", raw=raw[:500])
                         try:
                             msg = json.loads(raw)
                             # Server sends list of events or empty list on subscribe ack
@@ -93,9 +94,11 @@ class WSClient:
         # Polymarket WS protocol: one message with all asset IDs
         sub = {
             "assets_ids": self._asset_ids,
-            "type": "market",
+            "type": "Market",
         }
-        await ws.send(json.dumps(sub))
+        payload = json.dumps(sub)
+        log.info("ws.subscribing", assets=len(self._asset_ids), payload=payload[:500])
+        await ws.send(payload)
         log.info("ws.subscribed", assets=len(self._asset_ids))
 
     async def _dispatch(self, msg: dict[str, Any]) -> None:
