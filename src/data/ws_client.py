@@ -57,11 +57,14 @@ class WSClient:
                     attempt = 0
                     await self._send_subscriptions(ws)
                     async for raw in ws:
-                        log.debug("ws.raw_message", raw=raw[:500])
+                        print(f"[WS RAW] {raw[:300]}", flush=True)
+                        log.info("ws.raw_message", raw=raw[:500])
                         try:
                             msg = json.loads(raw)
                             # Server sends list of events or empty list on subscribe ack
                             if isinstance(msg, list):
+                                if not msg:
+                                    log.info("ws.subscription_ack", status="empty_list_ok")
                                 for item in msg:
                                     if isinstance(item, dict):
                                         await self._dispatch(item)
