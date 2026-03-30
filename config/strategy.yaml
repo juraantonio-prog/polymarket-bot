@@ -1,7 +1,7 @@
 # Spike-fade strategy parameters
 spike_fade:
-  # Minimum price spike to trigger signal (fractional, e.g. 0.05 = 5%)
-  min_spike_magnitude: 0.05
+  # Minimum price spike to trigger signal (fractional, e.g. 0.08 = 8pp)
+  min_spike_magnitude: 0.08
   # Lookback window for baseline price (seconds)
   baseline_window_seconds: 600
   # Volume spike multiplier vs rolling average required

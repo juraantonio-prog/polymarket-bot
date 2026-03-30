@@ -56,30 +56,82 @@ class SpikeFadeDetector:
         Evaluate a market snapshot for spike-fade signal.
         Returns signal or None.
         """
+        magnitude_pct = abs(snapshot.price_change_pct)
+        magnitude_pp = round(magnitude_pct * 100, 2)
+        gap_pp = round((self._min_spike - magnitude_pct) * 100, 2)
+
         # Time-to-expiry filter
         if days_to_expiry < self._min_days:
-            log.debug("spike_fade.reject_expiry", market=snapshot.market_id, days=days_to_expiry)
+            log.info(
+                "spike_fade.no_signal",
+                market=snapshot.market_id,
+                reason="expiry",
+                days=round(days_to_expiry, 1),
+                min_days=self._min_days,
+                price=round(snapshot.current_price, 4),
+                move_pp=magnitude_pp,
+                gap_to_threshold_pp=gap_pp,
+            )
             return None
 
         # Spread filter
         if spread > self._max_spread:
-            log.debug("spike_fade.reject_spread", market=snapshot.market_id, spread=spread)
+            log.info(
+                "spike_fade.no_signal",
+                market=snapshot.market_id,
+                reason="spread",
+                spread=round(spread, 4),
+                max_spread=self._max_spread,
+                price=round(snapshot.current_price, 4),
+                move_pp=magnitude_pp,
+                gap_to_threshold_pp=gap_pp,
+            )
             return None
 
-        # Minimum volume filter
-        if current_volume_usd < self._min_volume_usd:
-            log.debug("spike_fade.reject_volume", market=snapshot.market_id, vol=current_volume_usd)
+        # Minimum rolling volume filter — use snapshot.rolling_volume, not single-tick size
+        rolling_vol = snapshot.rolling_volume
+        if rolling_vol < self._min_volume_usd:
+            log.info(
+                "spike_fade.no_signal",
+                market=snapshot.market_id,
+                reason="rolling_volume",
+                rolling_vol_usd=round(rolling_vol, 0),
+                min_vol_usd=self._min_volume_usd,
+                price=round(snapshot.current_price, 4),
+                move_pp=magnitude_pp,
+                gap_to_threshold_pp=gap_pp,
+            )
             return None
 
         # Magnitude filter
-        magnitude_pct = abs(snapshot.price_change_pct)
         if magnitude_pct < self._min_spike:
+            log.info(
+                "spike_fade.no_signal",
+                market=snapshot.market_id,
+                reason="magnitude",
+                price=round(snapshot.current_price, 4),
+                baseline=round(snapshot.baseline_price, 4),
+                move_pp=magnitude_pp,
+                threshold_pp=round(self._min_spike * 100, 2),
+                gap_to_threshold_pp=gap_pp,
+                ticks=snapshot.tick_count,
+            )
             return None
 
-        # Volume spike filter
+        # Volume spike filter — compare current tick vs rolling avg per tick
         vol_ratio = (current_volume_usd / snapshot.avg_volume_per_tick) if snapshot.avg_volume_per_tick > 0 else 0.0
         if vol_ratio < self._vol_spike_mult:
-            log.debug("spike_fade.reject_vol_spike", market=snapshot.market_id, ratio=vol_ratio)
+            log.info(
+                "spike_fade.no_signal",
+                market=snapshot.market_id,
+                reason="vol_spike",
+                vol_ratio=round(vol_ratio, 2),
+                required_ratio=self._vol_spike_mult,
+                tick_vol_usd=round(current_volume_usd, 2),
+                avg_tick_vol_usd=round(snapshot.avg_volume_per_tick, 2),
+                price=round(snapshot.current_price, 4),
+                move_pp=magnitude_pp,
+            )
             return None
 
         # Determine direction: if price spiked UP → fade = sell YES (fade_yes)
