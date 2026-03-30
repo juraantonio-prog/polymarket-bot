@@ -6,8 +6,8 @@ spike_fade:
   baseline_window_seconds: 600
   # Volume spike multiplier vs rolling average required
   volume_spike_multiplier: 2.0
-  # Minimum absolute volume in USD for signal
-  min_volume_usd: 5000
+  # Minimum rolling volume in USD for signal (low for paper trading)
+  min_volume_usd: 100
 
 # Confidence scoring weights (must sum to 1.0)
 confidence:

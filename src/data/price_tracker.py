@@ -43,18 +43,29 @@ class PriceTracker:
     def __init__(self, config: Config) -> None:
         pt = config.get("price_tracker", default={})
         self._window_sec = float(pt.get("window_seconds", 3600))
-        self._max_ticks = int(pt.get("max_ticks_in_memory", 360))
         self._baseline_window = float(
-            config.get("strategy", "spike_fade", "baseline_window_seconds", default=600)
+            config.get("spike_fade", "baseline_window_seconds", default=600)
         )
-        # token_id -> deque[PriceTick]
+        # Downsample: only keep one tick per interval to avoid deque overflow
+        # swamping the baseline window with same-price rapid messages.
+        self._min_tick_interval = float(pt.get("min_tick_interval_seconds", 10))
+        # token_id -> deque[PriceTick] (unbounded; time-based pruning handles memory)
         self._ticks: dict[str, deque[PriceTick]] = {}
+        # token_id -> last accepted tick timestamp
+        self._last_tick_ts: dict[str, float] = {}
 
     def add_tick(self, tick: PriceTick) -> None:
-        q = self._ticks.setdefault(tick.token_id, deque(maxlen=self._max_ticks))
+        now = tick.timestamp
+        last = self._last_tick_ts.get(tick.token_id, 0.0)
+        # Downsample: skip tick if it arrived too soon after the previous one
+        if now - last < self._min_tick_interval:
+            return
+        self._last_tick_ts[tick.token_id] = now
+
+        q = self._ticks.setdefault(tick.token_id, deque())
         q.append(tick)
-        # Prune old ticks
-        cutoff = time.time() - self._window_sec
+        # Prune ticks older than the rolling window
+        cutoff = now - self._window_sec
         while q and q[0].timestamp < cutoff:
             q.popleft()
 
