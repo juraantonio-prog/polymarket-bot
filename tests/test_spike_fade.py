@@ -47,7 +47,7 @@ def test_detect_generates_signal():
     detector._max_spread = 0.10
 
     snap = _make_snapshot(price_change_pct=0.10, avg_vol=1000.0)
-    signal = detector.detect(snap, days_to_expiry=60, current_volume_usd=5000.0, spread=0.02)
+    signal = detector.detect(snap, days_to_expiry=60, current_volume_usd=5000.0, market_volume_usd=10_000_000, spread=0.02)
     assert signal is not None
     assert signal.direction == "fade_yes"
     assert signal.market_id == "mkt1"
@@ -63,7 +63,7 @@ def test_detect_rejects_low_expiry():
     detector._max_spread = 0.10
 
     snap = _make_snapshot(price_change_pct=0.10)
-    signal = detector.detect(snap, days_to_expiry=10, current_volume_usd=5000.0)
+    signal = detector.detect(snap, days_to_expiry=10, current_volume_usd=5000.0, market_volume_usd=10_000_000)
     assert signal is None
 
 
@@ -77,7 +77,7 @@ def test_detect_rejects_small_spike():
     detector._max_spread = 0.10
 
     snap = _make_snapshot(price_change_pct=0.02)  # below 5%
-    signal = detector.detect(snap, days_to_expiry=60, current_volume_usd=5000.0)
+    signal = detector.detect(snap, days_to_expiry=60, current_volume_usd=5000.0, market_volume_usd=10_000_000)
     assert signal is None
 
 
@@ -91,7 +91,21 @@ def test_detect_rejects_wide_spread():
     detector._max_spread = 0.10
 
     snap = _make_snapshot(price_change_pct=0.10)
-    signal = detector.detect(snap, days_to_expiry=60, current_volume_usd=5000.0, spread=0.15)
+    signal = detector.detect(snap, days_to_expiry=60, current_volume_usd=5000.0, market_volume_usd=10_000_000, spread=0.15)
+    assert signal is None
+
+
+def test_detect_rejects_low_market_volume():
+    detector = SpikeFadeDetector.__new__(SpikeFadeDetector)
+    detector._min_spike = 0.05
+    detector._baseline_window = 600
+    detector._vol_spike_mult = 2.0
+    detector._min_volume_usd = 500_000
+    detector._min_days = 30
+    detector._max_spread = 0.10
+
+    snap = _make_snapshot(price_change_pct=0.10)
+    signal = detector.detect(snap, days_to_expiry=60, current_volume_usd=5000.0, market_volume_usd=14.0)
     assert signal is None
 
 
@@ -105,6 +119,6 @@ def test_fade_no_direction():
     detector._max_spread = 0.10
 
     snap = _make_snapshot(price_change_pct=-0.10, current_price=0.30)
-    signal = detector.detect(snap, days_to_expiry=60, current_volume_usd=5000.0)
+    signal = detector.detect(snap, days_to_expiry=60, current_volume_usd=5000.0, market_volume_usd=10_000_000)
     assert signal is not None
     assert signal.direction == "fade_no"

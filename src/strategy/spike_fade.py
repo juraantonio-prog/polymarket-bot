@@ -50,6 +50,7 @@ class SpikeFadeDetector:
         snapshot: MarketSnapshot,
         days_to_expiry: float,
         current_volume_usd: float,
+        market_volume_usd: float = 0.0,
         spread: float = 0.0,
     ) -> Optional[SpikeFadeSignal]:
         """
@@ -88,14 +89,13 @@ class SpikeFadeDetector:
             )
             return None
 
-        # Minimum rolling volume filter — use snapshot.rolling_volume, not single-tick size
-        rolling_vol = snapshot.rolling_volume
-        if rolling_vol < self._min_volume_usd:
+        # Minimum volume filter — use Gamma API market volume, not WS tick sizes
+        if market_volume_usd < self._min_volume_usd:
             log.info(
                 "spike_fade.no_signal",
                 market=snapshot.market_id,
-                reason="rolling_volume",
-                rolling_vol_usd=round(rolling_vol, 0),
+                reason="market_volume",
+                market_vol_usd=round(market_volume_usd, 0),
                 min_vol_usd=self._min_volume_usd,
                 price=round(snapshot.current_price, 4),
                 move_pp=magnitude_pp,

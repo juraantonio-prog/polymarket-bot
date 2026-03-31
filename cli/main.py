@@ -228,7 +228,7 @@ def run_bot(ctx: click.Context, mode: str) -> None:
 
                 # Find market for this token
                 market_row = await db.fetchone(
-                    "SELECT id, name, days_to_expiry FROM markets WHERE raw_json LIKE ?",
+                    "SELECT id, name, days_to_expiry, raw_json FROM markets WHERE raw_json LIKE ?",
                     (f"%{asset_id}%",),
                 )
                 if not market_row:
@@ -238,6 +238,13 @@ def run_bot(ctx: click.Context, mode: str) -> None:
                 market_name = market_row["name"]
                 days = float(market_row.get("days_to_expiry") or 9999)
 
+                # Parse Gamma API market volume from stored discovery data
+                try:
+                    _m = json.loads(market_row.get("raw_json") or "{}")
+                except Exception:
+                    _m = {}
+                market_vol_usd = float(_m.get("volumeNum", _m.get("volume", 0)) or 0)
+
                 snap = tracker.get_snapshot(market_id, asset_id)
                 if snap is None:
                     return
@@ -246,6 +253,7 @@ def run_bot(ctx: click.Context, mode: str) -> None:
                     snapshot=snap,
                     days_to_expiry=days,
                     current_volume_usd=tick.volume_usd,
+                    market_volume_usd=market_vol_usd,
                 )
                 if not signal:
                     return
