@@ -60,6 +60,7 @@ async def test_try_open_returns_none_below_threshold():
     engine._time_stop_sec = 2400
     engine._notional_usd = 100
     engine._max_open = 5
+    engine._threshold = 0.55
     tracker = AsyncMock()
     tracker.count_open = AsyncMock(return_value=0)
     engine._tracker = tracker
@@ -82,6 +83,7 @@ async def test_try_open_respects_max_positions():
     engine._time_stop_sec = 2400
     engine._notional_usd = 100
     engine._max_open = 5
+    engine._threshold = 0.55
     tracker = AsyncMock()
     tracker.count_open = AsyncMock(return_value=5)  # at max
     engine._tracker = tracker
@@ -102,6 +104,7 @@ async def test_slippage_applied_fade_yes():
     engine._time_stop_sec = 2400
     engine._notional_usd = 100
     engine._max_open = 5
+    engine._threshold = 0.55
     tracker = AsyncMock()
     tracker.count_open = AsyncMock(return_value=0)
     mock_pos = Position(

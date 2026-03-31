@@ -279,6 +279,8 @@ def run_bot(ctx: click.Context, mode: str) -> None:
                     mode=mode,
                 )
 
+                log.info("on_message.calling_engine", market=market_id,
+                         direction=signal.direction, confidence=round(confidence.total, 4))
                 pos = await engine.try_open(signal, confidence, market_name)
                 if pos:
                     await alerter.send_position_open(

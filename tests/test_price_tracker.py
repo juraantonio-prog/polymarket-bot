@@ -9,9 +9,10 @@ from src.data.price_tracker import PriceTracker, PriceTick
 def _make_tracker() -> PriceTracker:
     tracker = PriceTracker.__new__(PriceTracker)
     tracker._window_sec = 3600.0
-    tracker._max_ticks = 360
     tracker._baseline_window = 600.0
+    tracker._min_tick_interval = 0.0  # no downsampling in tests
     tracker._ticks = {}
+    tracker._last_tick_ts = {}
     return tracker
 
 

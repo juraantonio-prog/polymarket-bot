@@ -105,8 +105,9 @@ class WSClient:
         log.info("ws.subscribed", assets=len(self._asset_ids))
 
     async def _dispatch(self, msg: dict[str, Any]) -> None:
+        import traceback
         for handler in self._handlers:
             try:
                 await handler(msg)
             except Exception as exc:
-                log.error("ws.handler_error", error=str(exc))
+                log.error("ws.handler_error", error=str(exc), traceback=traceback.format_exc())
