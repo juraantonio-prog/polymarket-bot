@@ -4,8 +4,8 @@ spike_fade:
   min_spike_magnitude: 0.08
   # Lookback window for baseline price (seconds)
   baseline_window_seconds: 600
-  # Volume spike multiplier vs rolling average required
-  volume_spike_multiplier: 2.0
+  # Volume spike multiplier vs rolling average (paper trading: 0.5, live: 2.0+)
+  volume_spike_multiplier: 0.5
   # Minimum rolling volume in USD for signal (low for paper trading)
   min_volume_usd: 100
 
