@@ -3,7 +3,7 @@ _Ažuriraj ovaj fajl nakon svake sesije i uploadaj zajedno s Word specom na poč
 
 ---
 
-## Zadnje ažuriranje: 29.03.2026.
+## Zadnje ažuriranje: 30.03.2026.
 
 ---
 
@@ -31,14 +31,14 @@ _Ažuriraj ovaj fajl nakon svake sesije i uploadaj zajedno s Word specom na poč
 | ✅ | Bot radi 24/7 na VPS-u |
 | ✅ | systemd servis aktivan i enabled |
 | ✅ | Telegram daily report stiže |
-| ✅ | `config/markets.yaml` postoji |
-| ✅ | Discovery: 85 tržišta prolazi filter |
-| ✅ | WebSocket subscribed na 174 assets |
-| ✅ | WS prima live price updateove (WS RAW potvrđen 29.03.) |
+| ✅ | Discovery: 85 tržišta, 174 assets |
+| ✅ | WebSocket prima live price updateove |
+| ✅ | move_pp nenulte vrijednosti potvrđene |
+| ✅ | Signal detection logika radi ispravno |
 | ✅ | **30 dana paper trading sat kreće od 29.03.2026.** |
-| ⏳ | Čekamo prvi spike-fade signal (12pp+ pomak) |
-| ❌ | Sports tržišta prolaze filter (NBA Finals, FIFA World Cup) |
-| ❌ | TP/SL bug za niske cijene (TP ispod entry za niske cijene) |
+| ⏳ | Čekamo spike event (8pp+ pomak) za prvi signal |
+| ❌ | Sports tržišta prolaze filter (NBA, FIFA) |
+| ❌ | TP/SL bug za niske cijene |
 
 ---
 
@@ -56,28 +56,39 @@ _Ažuriraj ovaj fajl nakon svake sesije i uploadaj zajedno s Word specom na poč
 
 ## Povijest fixeva
 
-### Fix 1 — 26.03.2026. ✅
-`config/markets.yaml` nije postojao → kreiran, `min_volume_usd` spušten na $500k, kategorije proširene.
+### Fix 1 — 26.03. ✅
+`config/markets.yaml` nije postojao → kreiran, `min_volume_usd` spušten na $500k.
 
-### Fix 2 — 26.03.2026. ✅
-85 tržišta imalo prazan tag → untagged tržišta sad prolaze category filter.
-Rezultat: `filtered: 85, Tracking 85 markets, assets: 170`
+### Fix 2 — 26.03. ✅
+Untagged tržišta prolaze category filter.
+Rezultat: `filtered: 85, Tracking 85 markets`
 
-### Fix 3 — 29.03.2026. ✅
-WS subscription tip `"market"` → `"Market"` (veliko M) — server prihvaćao ali nije slao podatke.
+### Fix 3 — 29.03. ✅
+WS subscription `"market"` → `"Market"` — server prihvaćao ali nije slao podatke.
 
-### Fix 4 — 29.03.2026. ✅
-`ws.raw_message` prebačen s DEBUG na INFO + dodan `print()` za vidljivost.
-Rezultat: live price updateovi potvrđeni u logovima.
+### Fix 4 — 29.03. ✅
+`ws.raw_message` DEBUG → INFO + `print()`. Live price updateovi potvrđeni.
+
+### Fix 5 — 30.03. ✅
+**Deque overflow** → `baseline_window` uvijek prazna → `move_pp = 0.0` uvijek.
+Fix: downsampling na 1 tick/10s, deque sada pokriva 1h podataka.
+
+### Fix 6 — 30.03. ✅
+**Volume filter bug** — `current_volume_usd` (per-tick $1-50) uspoređivan s `min_vol_usd: 5000`.
+Fix: koristi `snapshot.rolling_volume`. `min_volume_usd` spušten na 100.
+
+### Fix 7 — 30.03. ✅
+**Spike threshold** spušten: 12pp → 8pp za paper trading fazu.
+Logging dodan: svaki odbijeni signal logga reason, move_pp, gap_to_threshold_pp.
 
 ---
 
 ## Poznati bugovi (sljedeći fix)
 
-1. **Sports tržišta prolaze filter** — NBA Finals, FIFA World Cup prolaze jer nemaju tagove
-   - Fix: keyword filter na name/slug (nba, nfl, fifa, world-cup, nhl, mlb, boxing, mma, ufc)
+1. **Sports tržišta prolaze filter** — NBA Finals, FIFA World Cup nemaju tagove
+   - Fix: keyword filter na name/slug (nba, nfl, fifa, world-cup, nhl, mlb, mma, ufc)
 
-2. **TP/SL bug za niske cijene** — TP ispod entry cijene za tržišta s entry < 0.10
+2. **TP/SL bug za niske cijene** — TP ispod entry za tržišta s entry < 0.10
    - Fix: logika u `spike_fade.py`
 
 ---
@@ -87,14 +98,13 @@ Rezultat: live price updateovi potvrđeni u logovima.
 ```bash
 # Lokalno (laptop):
 cd C:\ClaudeProjects\polymarket-bot
-claude  # napravi izmjene
+claude
 git add -A && git commit -m "opis" && git push origin master
 
 # Na VPS-u (SSH):
 cd /root/polymarket-bot
 git pull
 systemctl restart polymarket-bot
-systemctl status polymarket-bot
 ```
 
 ---
@@ -102,15 +112,11 @@ systemctl status polymarket-bot
 ## Dijagnostičke komande (VPS)
 
 ```bash
+# Signal debug (što blokira signale):
+journalctl -u polymarket-bot --since "5 min ago" --no-pager | grep spike_fade.no_signal | tail -20
+
 # Live logovi:
-journalctl -u polymarket-bot -f | grep -E "raw_message|signal|spike|trade"
-
-# Zadnjih 50 linija:
-journalctl -u polymarket-bot -n 50 --no-pager
-
-# Discovery test:
-cd /root/polymarket-bot && source venv/bin/activate
-python /root/polymarket-bot/cli/main.py discover-markets
+journalctl -u polymarket-bot -f | grep -E "signal|spike|trade|subscribed"
 
 # DB provjera:
 sqlite3 /root/polymarket-bot/data/polymarket_bot.db "SELECT COUNT(*) FROM signals; SELECT COUNT(*) FROM trades;"
