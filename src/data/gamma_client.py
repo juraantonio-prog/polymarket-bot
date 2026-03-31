@@ -154,7 +154,24 @@ class GammaClient:
                 tag_labels.add(top_category)
 
             if not tag_labels:
-                # Market has no tags — pass it through, let volume/expiry filters decide.
+                # Market has no tags — check name/slug for blocked sports keywords.
+                _BLOCKED_NAME_KEYWORDS = {
+                    "nba", "nfl", "fifa", "nhl", "mlb", "world cup",
+                    "champions league", "76ers", "lakers", "celtics",
+                    "warriors", "knicks", "finals", "playoff", "super bowl",
+                    "ufc", "boxing", "mma", "wrestling",
+                }
+                slug = (m.get("slug", "") or "").lower()
+                name_lower = name.lower()
+                hit = next(
+                    (kw for kw in _BLOCKED_NAME_KEYWORDS if kw in name_lower or kw in slug),
+                    None,
+                )
+                if hit:
+                    reason = f"blocked_keyword({hit})"
+                    rejection_counts[reason] = rejection_counts.get(reason, 0) + 1
+                    log.debug("gamma.market_rejected", reason=reason, market=name[:60])
+                    continue
                 log.debug("gamma.market_untagged", market=name[:60])
             else:
                 # Reject if category is explicitly blocked
