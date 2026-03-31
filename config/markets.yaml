@@ -13,13 +13,9 @@ filters:
     - politics
     - geopolitics
     - macro
-    - crypto
-    - cryptocurrency
     - science
     - technology
     - tech
-    - entertainment
-    - culture
     - business
     - finance
     - economics
@@ -51,6 +47,10 @@ filters:
     - hockey
     - racing
     - esports
+    - crypto
+    - cryptocurrency
+    - entertainment
+    - culture
 
 # Per-market overrides (use Polymarket conditionId)
 market_overrides:

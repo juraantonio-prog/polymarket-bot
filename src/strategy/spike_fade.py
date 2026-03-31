@@ -5,6 +5,7 @@ All thresholds come from config/strategy.yaml.
 """
 from __future__ import annotations
 
+import time
 from dataclasses import dataclass
 from datetime import datetime, timezone
 from typing import Optional
@@ -42,8 +43,11 @@ class SpikeFadeDetector:
         self._baseline_window = float(sf.get("baseline_window_seconds", 600))
         self._vol_spike_mult = float(sf.get("volume_spike_multiplier", 2.0))
         self._min_volume_usd = float(sf.get("min_volume_usd", 5000))
+        self._cooldown_sec = float(sf.get("cooldown_seconds_per_market", 300))
         self._min_days = float(config.get("expiry", "min_days_to_expiry", default=30))
         self._max_spread = float(config.get("filters", "max_spread", default=0.10))
+        # market_id -> timestamp of last emitted signal
+        self._last_signal_ts: dict[str, float] = {}
 
     def detect(
         self,
@@ -60,6 +64,20 @@ class SpikeFadeDetector:
         magnitude_pct = abs(snapshot.price_change_pct)
         magnitude_pp = round(magnitude_pct * 100, 2)
         gap_pp = round((self._min_spike - magnitude_pct) * 100, 2)
+
+        # Cooldown filter — prevent multiple signals on the same market within cooldown window
+        now = time.time()
+        last_ts = self._last_signal_ts.get(snapshot.market_id, 0.0)
+        elapsed = now - last_ts
+        if elapsed < self._cooldown_sec:
+            log.info(
+                "spike_fade.no_signal",
+                market=snapshot.market_id,
+                reason="cooldown",
+                elapsed_sec=round(elapsed, 0),
+                cooldown_sec=self._cooldown_sec,
+            )
+            return None
 
         # Time-to-expiry filter
         if days_to_expiry < self._min_days:
@@ -147,11 +165,13 @@ class SpikeFadeDetector:
             volume_spike_ratio=vol_ratio,
             days_to_expiry=days_to_expiry,
         )
+        self._last_signal_ts[snapshot.market_id] = time.time()
         log.info(
             "spike_fade.signal",
             market=snapshot.market_id,
             direction=direction,
             magnitude_pct=round(magnitude_pct, 4),
             vol_ratio=round(vol_ratio, 2),
+            cooldown_until=round(self._cooldown_sec, 0),
         )
         return signal

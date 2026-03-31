@@ -8,6 +8,8 @@ spike_fade:
   volume_spike_multiplier: 0.5
   # Minimum rolling volume in USD for signal (low for paper trading)
   min_volume_usd: 100
+  # Minimum seconds between signals on the same market
+  cooldown_seconds_per_market: 300
 
 # Confidence scoring weights (must sum to 1.0)
 confidence:
