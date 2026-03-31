@@ -35,6 +35,7 @@ class PaperEngine:
         self._time_stop_sec = int(ex.get("time_stop_seconds", 2400))
         self._max_open = int(ex.get("max_open_positions", 5))
         self._notional_usd = float(config.get("risk", "notional_per_trade_usd", default=100))
+        self._threshold = float(config.get("confidence", "min_threshold", default=0.55))
         self._tracker = PositionTracker(db)
         self._db = db
 
@@ -45,13 +46,21 @@ class PaperEngine:
         market_name: str = "",
     ) -> Optional[Position]:
         """Attempt to open a paper position for a signal."""
+        log.info(
+            "paper.try_open",
+            market=signal.market_id,
+            direction=signal.direction,
+            confidence=round(confidence.total, 4),
+            meets_threshold=confidence.meets_threshold,
+            threshold=self._threshold,
+        )
         if not confidence.meets_threshold:
-            log.debug("paper.below_threshold", market=signal.market_id, conf=confidence.total)
+            log.info("paper.below_threshold", market=signal.market_id, conf=round(confidence.total, 4))
             return None
 
         open_count = await self._tracker.count_open()
         if open_count >= self._max_open:
-            log.warning("paper.max_positions", open=open_count, max=self._max_open)
+            log.info("paper.max_positions", open=open_count, max=self._max_open)
             return None
 
         # Apply slippage to entry

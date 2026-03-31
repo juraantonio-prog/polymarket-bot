@@ -259,6 +259,16 @@ def run_bot(ctx: click.Context, mode: str) -> None:
                     return
 
                 confidence = scorer.score(signal)
+                log.info(
+                    "on_message.confidence",
+                    market=market_id,
+                    total=round(confidence.total, 4),
+                    spike=round(confidence.spike_magnitude_score, 4),
+                    vol=round(confidence.volume_confirmation_score, 4),
+                    liq=round(confidence.liquidity_score, 4),
+                    tod=round(confidence.time_of_day_score, 4),
+                    meets_threshold=confidence.meets_threshold,
+                )
                 await alerter.send_signal(
                     market_name=market_name,
                     direction=signal.direction,

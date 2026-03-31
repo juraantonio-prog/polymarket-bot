@@ -89,6 +89,8 @@ class TelegramAlerter:
         mode: str = "paper",
     ) -> bool:
         if confidence < self._min_confidence:
+            log.info("telegram.signal_skipped", reason="below_min_confidence",
+                     confidence=round(confidence, 4), min_required=self._min_confidence)
             return False
         text = self._render(
             "signal",

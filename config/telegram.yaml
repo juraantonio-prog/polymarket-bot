@@ -1,8 +1,8 @@
 # Telegram alert configuration
 alerts:
   enabled: true
-  # Minimum confidence to send alert
-  min_confidence_for_alert: 0.60
+  # Minimum confidence to send alert (paper trading: 0.40, live: 0.60)
+  min_confidence_for_alert: 0.40
   # Rate limit: max alerts per hour
   max_alerts_per_hour: 20
   # Message templates use Python .format() syntax

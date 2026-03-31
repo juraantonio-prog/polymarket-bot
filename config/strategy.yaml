@@ -16,8 +16,8 @@ confidence:
     volume_confirmation: 0.30
     liquidity_score: 0.20
     time_of_day: 0.15
-  # Minimum confidence to open position
-  min_threshold: 0.55
+  # Minimum confidence to open position (paper trading: 0.40, live: 0.55+)
+  min_threshold: 0.40
   # All sub-scores normalized to [0.0, 1.0]
 
 # Time-to-expiry filter
