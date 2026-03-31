@@ -258,30 +258,33 @@ def run_bot(ctx: click.Context, mode: str) -> None:
                 if not signal:
                     return
 
-                confidence = scorer.score(signal)
-                log.info(
-                    "on_message.confidence",
-                    market=market_id,
-                    total=round(confidence.total, 4),
-                    spike=round(confidence.spike_magnitude_score, 4),
-                    vol=round(confidence.volume_confirmation_score, 4),
-                    liq=round(confidence.liquidity_score, 4),
-                    tod=round(confidence.time_of_day_score, 4),
-                    meets_threshold=confidence.meets_threshold,
-                )
-                await alerter.send_signal(
-                    market_name=market_name,
-                    direction=signal.direction,
-                    entry_price=signal.entry_price,
-                    confidence=confidence.total,
-                    days_to_expiry=signal.days_to_expiry,
-                    volume_spike=signal.volume_spike_ratio,
-                    mode=mode,
-                )
+                print(f"[SIGNAL] {signal.direction} market={market_id} mag={round(signal.spike_magnitude_pct,4)}", flush=True)
 
-                log.info("on_message.calling_engine", market=market_id,
-                         direction=signal.direction, confidence=round(confidence.total, 4))
+                try:
+                    confidence = scorer.score(signal)
+                except Exception as exc:
+                    print(f"[SIGNAL ERROR] scorer.score failed: {exc}", flush=True)
+                    raise
+
+                print(f"[CONFIDENCE] total={round(confidence.total,4)} meets={confidence.meets_threshold}", flush=True)
+
+                try:
+                    await alerter.send_signal(
+                        market_name=market_name,
+                        direction=signal.direction,
+                        entry_price=signal.entry_price,
+                        confidence=confidence.total,
+                        days_to_expiry=signal.days_to_expiry,
+                        volume_spike=signal.volume_spike_ratio,
+                        mode=mode,
+                    )
+                except Exception as exc:
+                    print(f"[SIGNAL ERROR] alerter.send_signal failed: {exc}", flush=True)
+                    raise
+
+                print(f"[ENGINE] calling try_open market={market_id}", flush=True)
                 pos = await engine.try_open(signal, confidence, market_name)
+                print(f"[ENGINE] try_open returned pos={pos}", flush=True)
                 if pos:
                     await alerter.send_position_open(
                         market_name=market_name,
