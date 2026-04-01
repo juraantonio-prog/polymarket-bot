@@ -212,6 +212,20 @@ def run_bot(ctx: click.Context, mode: str) -> None:
                         if tid:
                             ws.subscribe_asset(str(tid))
 
+            # token_id (CLOB) → market_id (Gamma conditionId)
+            token_to_market: dict[str, str] = {}
+            for m in markets:
+                mid = m.get("conditionId", m.get("id", ""))
+                clob_ids_map = m.get("clobTokenIds", m.get("clob_token_ids", m.get("tokens", "[]")))
+                if isinstance(clob_ids_map, str):
+                    try:
+                        clob_ids_map = json.loads(clob_ids_map)
+                    except Exception:
+                        clob_ids_map = []
+                for tid in clob_ids_map:
+                    if tid and mid:
+                        token_to_market[str(tid)] = mid
+
             # WS message handler
             async def on_message(msg: dict) -> None:
                 asset_id = msg.get("asset_id", msg.get("market", ""))
@@ -300,9 +314,15 @@ def run_bot(ctx: click.Context, mode: str) -> None:
             async def exit_loop() -> None:
                 while True:
                     await asyncio.sleep(30)
-                    prices = {tid: tracker.get_snapshot("", tid).current_price
-                              for tid in tracker.token_ids()
-                              if tracker.get_snapshot("", tid)}
+                    # Build prices keyed by market_id (conditionId), not token_id
+                    prices: dict[str, float] = {}
+                    for tid in tracker.token_ids():
+                        mid = token_to_market.get(tid)
+                        if not mid:
+                            continue
+                        snap = tracker.get_snapshot(mid, tid)
+                        if snap:
+                            prices[mid] = snap.current_price
                     closed = await engine.check_exits(prices)
                     for cp in closed:
                         mrow = await db.fetchone("SELECT name FROM markets WHERE id = ?", (cp.market_id,))
