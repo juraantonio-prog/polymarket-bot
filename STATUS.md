@@ -3,7 +3,7 @@ _Ažuriraj ovaj fajl nakon svake sesije i uploadaj zajedno s Word specom na poč
 
 ---
 
-## Zadnje ažuriranje: 30.03.2026.
+## Zadnje ažuriranje: 01.04.2026.
 
 ---
 
@@ -21,6 +21,10 @@ _Ažuriraj ovaj fajl nakon svake sesije i uploadaj zajedno s Word specom na poč
 | Branch | `master` (ne main!) |
 | Claude Code | radi lokalno na laptopu, ne na VPS-u |
 | CLI komanda | `python /root/polymarket-bot/cli/main.py <cmd>` |
+| Prava DB | `/root/polymarket-bot/data/polymarket.db` |
+| sqlite3 putanja | `/usr/bin/sqlite3` (ne samo `sqlite3`!) |
+| Telegram token | `8581641008:AAH8VNWO_ox5ENjPEoL1L22r_159Q054qvE` (revoked 01.04.) |
+| Telegram chat_id | `8731364432` (bez minusa — private chat) |
 
 ---
 
@@ -30,15 +34,15 @@ _Ažuriraj ovaj fajl nakon svake sesije i uploadaj zajedno s Word specom na poč
 |-|--------|
 | ✅ | Bot radi 24/7 na VPS-u |
 | ✅ | systemd servis aktivan i enabled |
-| ✅ | Telegram daily report stiže |
-| ✅ | Discovery: 85 tržišta, 174 assets |
+| ✅ | Telegram alertovi rade (novi token 01.04.) |
 | ✅ | WebSocket prima live price updateove |
-| ✅ | move_pp nenulte vrijednosti potvrđene |
-| ✅ | Signal detection logika radi ispravno |
+| ✅ | Signal detection radi |
+| ✅ | Paper engine otvara pozicije |
+| ✅ | Exit logika implementirana (TP/SL/timeout svakih 30s) |
+| ✅ | Cooldown 300s per market |
+| ✅ | Sports/crypto/entertainment blokirani po keyword filteru |
 | ✅ | **30 dana paper trading sat kreće od 29.03.2026.** |
-| ⏳ | Čekamo spike event (8pp+ pomak) za prvi signal |
-| ❌ | Sports tržišta prolaze filter (NBA, FIFA) |
-| ❌ | TP/SL bug za niske cijene |
+| ⏳ | Monitoring — čekamo zatvaranje prvih pozicija s P&L |
 
 ---
 
@@ -48,48 +52,76 @@ _Ažuriraj ovaj fajl nakon svake sesije i uploadaj zajedno s Word specom na poč
 
 - Paper bankroll: $10,000
 - Nominalni iznos po tradu: $100
-- Max otvorenih pozicija: 4
+- Max otvorenih pozicija: 5
+- Cooldown per market: 300s (5 min)
 - Live trading: **ONEMOGUĆEN**
 - **Cilj: 50+ tradova do ~29.04.2026.**
 
 ---
 
-## Povijest fixeva
+## Strategija (spike-fade)
 
-### Fix 1 — 26.03. ✅
-`config/markets.yaml` nije postojao → kreiran, `min_volume_usd` spušten na $500k.
-
-### Fix 2 — 26.03. ✅
-Untagged tržišta prolaze category filter.
-Rezultat: `filtered: 85, Tracking 85 markets`
-
-### Fix 3 — 29.03. ✅
-WS subscription `"market"` → `"Market"` — server prihvaćao ali nije slao podatke.
-
-### Fix 4 — 29.03. ✅
-`ws.raw_message` DEBUG → INFO + `print()`. Live price updateovi potvrđeni.
-
-### Fix 5 — 30.03. ✅
-**Deque overflow** → `baseline_window` uvijek prazna → `move_pp = 0.0` uvijek.
-Fix: downsampling na 1 tick/10s, deque sada pokriva 1h podataka.
-
-### Fix 6 — 30.03. ✅
-**Volume filter bug** — `current_volume_usd` (per-tick $1-50) uspoređivan s `min_vol_usd: 5000`.
-Fix: koristi `snapshot.rolling_volume`. `min_volume_usd` spušten na 100.
-
-### Fix 7 — 30.03. ✅
-**Spike threshold** spušten: 12pp → 8pp za paper trading fazu.
-Logging dodan: svaki odbijeni signal logga reason, move_pp, gap_to_threshold_pp.
+| Parametar | Vrijednost |
+|-----------|-----------|
+| Min. pomak cijene | 8pp |
+| Rolling window | 600s (10 min) |
+| Volume filter | market_volume_usd iz Gamma API |
+| Min. market volume | $500,000 |
+| Take profit | ±0.06 od entry |
+| Stop loss | ∓0.04 od entry |
+| Max hold | 2400s (40 min) |
+| Min. confidence | 0.40 |
+| Exit check interval | 30s |
 
 ---
 
-## Poznati bugovi (sljedeći fix)
+## Dozvoljene/blokirane kategorije
 
-1. **Sports tržišta prolaze filter** — NBA Finals, FIFA World Cup nemaju tagove
-   - Fix: keyword filter na name/slug (nba, nfl, fifa, world-cup, nhl, mlb, mma, ufc)
+**Dozvoljeno:** geopolitics, macro, politics, elections
 
-2. **TP/SL bug za niske cijene** — TP ispod entry za tržišta s entry < 0.10
-   - Fix: logika u `spike_fade.py`
+**Blokirano (tagovi):** sports, nba, nfl, fifa, mma, boxing, crypto, cryptocurrency, entertainment, culture, celebrity
+
+**Blokirano (keyword u imenu/slugu):** nba, nfl, fifa, nhl, mlb, world cup, champions league, 76ers, lakers, celtics, warriors, knicks, finals, playoff, super bowl, ufc, boxing, mma, wrestling
+
+---
+
+## Povijest fixeva
+
+### Fix 1-4 — 26-29.03. ✅
+markets.yaml kreiran, WS subscription tip ispravljen, price updateovi potvrđeni.
+
+### Fix 5-7 — 30.03. ✅
+Deque overflow, volume filter bug, spike threshold 12pp→8pp.
+
+### Fix 8-9 — 31.03. ✅
+Vol_spike filter, confidence threshold lanac (paper_engine→telegram).
+
+### Fix 10 — 31.03. ✅
+spike_fade.signal nije pozivao paper_engine — ispravan await lanac.
+
+### Fix 11 — 31.03. ✅
+Telegram chat_id minus uklonjen (-8731364432 → 8731364432).
+
+### Fix 12 — 31.03. ✅
+Cooldown 300s per market implementiran.
+
+### Fix 13 — 31.03. ✅
+Crypto/entertainment/sports keyword filter dodan.
+
+### Fix 14 — 01.04. ✅
+**Exit logika nije radila** — `exit_loop` gradio prices keyed by token_id, ali `check_exits` tražio market_id (conditionId). Nikad matchalo → pozicije ostajale zauvijek open → max 5 popunjeno → 0 novih tradova.
+Fix: `token_to_market` mapping, prices dict keyed by market_id.
+
+### Fix 15 — 01.04. ✅
+Telegram token revoked i zamijenjen novim (stari davao 401 Unauthorized).
+
+---
+
+## Resetiranje pozicija (kad je max dostignut)
+
+```bash
+/usr/bin/sqlite3 /root/polymarket-bot/data/polymarket.db "UPDATE positions SET status='closed' WHERE status='open';"
+```
 
 ---
 
@@ -112,23 +144,25 @@ systemctl restart polymarket-bot
 ## Dijagnostičke komande (VPS)
 
 ```bash
-# Signal debug (što blokira signale):
-journalctl -u polymarket-bot --since "5 min ago" --no-pager | grep spike_fade.no_signal | tail -20
+# Status:
+systemctl status polymarket-bot
 
-# Live logovi:
-journalctl -u polymarket-bot -f | grep -E "signal|spike|trade|subscribed"
+# Signali i pozicije:
+journalctl -u polymarket-bot --since "30 min ago" --no-pager | grep -E "SIGNAL|paper\.|exit|closed" | tail -20
 
-# DB provjera:
-sqlite3 /root/polymarket-bot/data/polymarket_bot.db "SELECT COUNT(*) FROM signals; SELECT COUNT(*) FROM trades;"
+# Otvorene pozicije:
+/usr/bin/sqlite3 /root/polymarket-bot/data/polymarket.db "SELECT COUNT(*) FROM positions WHERE status='open';"
+
+# Telegram test:
+curl -s "https://api.telegram.org/bot8581641008:AAH8VNWO_ox5ENjPEoL1L22r_159Q054qvE/sendMessage?chat_id=8731364432&text=Test"
 ```
 
 ---
 
 ## Sljedeći koraci
 
-- [ ] Fix sports keyword filter (NBA, FIFA prolaze)
-- [ ] Fix TP/SL logika za niske cijene
-- [ ] Pratiti prve signale na Telegramu
+- [ ] Potvrditi zatvaranje pozicija s P&L na Telegramu
+- [ ] Pratiti daily report s nenultim tradovima
 - [ ] Nakon 30 dana → Kelly Criterion, Bayesian scoring (@LunarResearcher)
 - [ ] Faza 2: Random Forest model (@noisyb0y1)
 
