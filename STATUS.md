@@ -23,8 +23,8 @@ _Ažuriraj ovaj fajl nakon svake sesije i uploadaj zajedno s Word specom na poč
 | CLI komanda | `python /root/polymarket-bot/cli/main.py <cmd>` |
 | Prava DB | `/root/polymarket-bot/data/polymarket.db` |
 | sqlite3 putanja | `/usr/bin/sqlite3` (ne samo `sqlite3`!) |
-| Telegram token | `8581641008:AAH8VNWO_ox5ENjPEoL1L22r_159Q054qvE` (revoked 01.04.) |
-| Telegram chat_id | `8731364432` (bez minusa — private chat) |
+| Telegram token | u `.env` kao `TELEGRAM_BOT_TOKEN` (revoked token uklonjen iz gita 02.04.) |
+| Telegram chat_id | u `.env` kao `TELEGRAM_CHAT_ID` (bez minusa — private chat) |
 
 ---
 
@@ -154,7 +154,7 @@ journalctl -u polymarket-bot --since "30 min ago" --no-pager | grep -E "SIGNAL|p
 /usr/bin/sqlite3 /root/polymarket-bot/data/polymarket.db "SELECT COUNT(*) FROM positions WHERE status='open';"
 
 # Telegram test:
-curl -s "https://api.telegram.org/bot8581641008:AAH8VNWO_ox5ENjPEoL1L22r_159Q054qvE/sendMessage?chat_id=8731364432&text=Test"
+curl -s "https://api.telegram.org/bot${TELEGRAM_BOT_TOKEN}/sendMessage?chat_id=${TELEGRAM_CHAT_ID}&text=Test"
 ```
 
 ---
