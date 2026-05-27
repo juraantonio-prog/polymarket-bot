@@ -83,9 +83,9 @@ class PositionTracker:
         direction = pos_row["direction"]
 
         if direction == "fade_yes":
-            pnl_pct = (entry - exit_price) / entry
+            pnl_pct = entry - exit_price
         else:
-            pnl_pct = (exit_price - entry) / entry
+            pnl_pct = exit_price - entry
 
         pnl_usd = size * pnl_pct
 
