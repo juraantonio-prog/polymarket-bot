@@ -3,7 +3,20 @@
     "allow": [
       "Bash(python:*)",
       "Bash(source:*)",
-      "Bash(git add:*)"
+      "Bash(git add:*)",
+      "Bash(git commit:*)",
+      "Bash(git push:*)",
+      "Bash(git pull:*)",
+      "Bash(venv/Scripts/python -m pytest tests/test_paper_engine.py -v)",
+      "Bash(venv/Scripts/python -m pytest tests/test_spike_fade.py -v 2>&1)",
+      "Bash(venv/Scripts/python -m pytest tests/test_spike_fade.py tests/test_confidence.py -v 2>&1)",
+      "Bash(venv/Scripts/python -m pytest tests/ -v --ignore=tests/test_clob_client.py 2>&1)",
+      "Bash(echo \"exit: $?\")",
+      "Bash(grep -E \"^\\\\+.*[0-9]{8,}:\")",
+      "Bash(grep -E \"^\\\\+.*[0-9]{8,}:[a-zA-Z0-9_-]{30,}\")",
+      "Bash(grep -rn --include=\"*.md\" --include=\"*.yaml\" --include=\"*.yml\" --include=\"*.py\" --include=\"*.txt\" --include=\"*.cfg\" --include=\"*.toml\" --include=\"*.json\" -E \"[0-9]{8,}:[a-zA-Z0-9_-]{30,}\" .)",
+      "Bash(grep -rn --include=\"*.md\" --include=\"*.yaml\" --include=\"*.py\" -iE \"\\(bot_token|api_key|private_key|secret|password|token\\)\\\\s*[=:]\\\\s*['\\\\\"]?[a-zA-Z0-9_\\\\-]{20,}\" .)",
+      "Bash(xargs grep:*)"
     ]
   }
 }
