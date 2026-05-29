@@ -22,6 +22,8 @@ class PerformanceMetrics:
     max_loss_usd: float
     avg_latency_ms: float
     sharpe_ratio: Optional[float]
+    signals_detected: int
+    skipped_signals: int
 
 
 class MetricsCalculator:
@@ -29,17 +31,28 @@ class MetricsCalculator:
         self._db = db
 
     async def compute(self, date_from: str = "", date_to: str = "") -> PerformanceMetrics:
-        where = "WHERE status = 'closed'"
-        params: tuple = ()
+        # Position filters
+        where_pos = "WHERE status = 'closed'"
+        params_pos: tuple = ()
         if date_from:
-            where += " AND closed_at >= ?"
-            params = params + (date_from,)
+            where_pos += " AND closed_at >= ?"
+            params_pos = params_pos + (date_from,)
         if date_to:
-            where += " AND closed_at <= ?"
-            params = params + (date_to,)
+            where_pos += " AND closed_at <= ?"
+            params_pos = params_pos + (date_to,)
+
+        # Signal filters (created_at matches the report date window)
+        where_sig = "WHERE 1=1"
+        params_sig: tuple = ()
+        if date_from:
+            where_sig += " AND created_at >= ?"
+            params_sig = params_sig + (date_from,)
+        if date_to:
+            where_sig += " AND created_at <= ?"
+            params_sig = params_sig + (date_to,)
 
         rows = await self._db.fetchall(
-            f"SELECT pnl_usd, pnl_pct FROM positions {where}", params
+            f"SELECT pnl_usd, pnl_pct FROM positions {where_pos}", params_pos
         )
         pnls = [float(r["pnl_usd"]) for r in rows if r["pnl_usd"] is not None]
 
@@ -61,6 +74,13 @@ class MetricsCalculator:
             if std_pnl > 0:
                 sharpe = (mean_pnl / std_pnl) * (252 ** 0.5)
 
+        # Signals detected vs positions opened → skipped signals
+        sig_row = await self._db.fetchone(
+            f"SELECT COUNT(*) as cnt FROM signals {where_sig}", params_sig
+        )
+        signals_detected = int(sig_row["cnt"]) if sig_row and sig_row["cnt"] else 0
+        skipped_signals = max(0, signals_detected - len(pnls))
+
         return PerformanceMetrics(
             total_trades=len(pnls),
             winning_trades=len(wins),
@@ -72,4 +92,6 @@ class MetricsCalculator:
             max_loss_usd=min(losses) if losses else 0.0,
             avg_latency_ms=avg_lat,
             sharpe_ratio=sharpe,
+            signals_detected=signals_detected,
+            skipped_signals=skipped_signals,
         )

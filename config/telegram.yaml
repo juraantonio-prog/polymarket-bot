@@ -1,7 +1,7 @@
 # Telegram alert configuration
 alerts:
   enabled: true
-  # Minimum confidence to send alert (paper trading: 0.40, live: 0.60)
+  # Minimum confidence to send signal alert (separate from position-open threshold)
   min_confidence_for_alert: 0.55
   # Rate limit: max alerts per hour
   max_alerts_per_hour: 20
@@ -29,7 +29,7 @@ alerts:
     daily_report: |
       📋 *DAILY REPORT*
       Date: {date}
-      Trades: {total_trades}
+      Trades: {total_trades} | Skipped signals: {skipped_signals}
       Win Rate: {win_rate:.1%}
       PnL: ${total_pnl:+.2f}
       Avg Latency: {avg_latency_ms:.0f}ms

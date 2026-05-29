@@ -43,8 +43,9 @@ class PriceTracker:
     def __init__(self, config: Config) -> None:
         pt = config.get("price_tracker", default={})
         self._window_sec = float(pt.get("window_seconds", 3600))
+        sf = config.get("spike_fade", default={})
         self._baseline_window = float(
-            config.get("spike_fade", "baseline_window_seconds", default=600)
+            sf.get("window_seconds", sf.get("baseline_window_seconds", 300))
         )
         # Downsample: only keep one tick per interval to avoid deque overflow
         # swamping the baseline window with same-price rapid messages.

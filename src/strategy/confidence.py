@@ -1,7 +1,7 @@
 """
 Confidence scoring with normalization.
-All sub-scores are normalized to [0.0, 1.0].
-Weights come from config/strategy.yaml.
+All sub-scores are normalized to [0.0, 1.0] before weighting.
+Weights and calibration thresholds come from config/strategy.yaml.
 """
 from __future__ import annotations
 
@@ -18,10 +18,12 @@ log = get_logger(__name__)
 @dataclass
 class ConfidenceScore:
     total: float                    # [0.0, 1.0]
-    spike_magnitude_score: float    # [0.0, 1.0]
-    volume_confirmation_score: float
-    liquidity_score: float
-    time_of_day_score: float
+    price_move_score: float         # clamp((move - min_move) / move_range, 0, 1)
+    volume_spike_score: float       # clamp((vol_mult - min_mult) / mult_range, 0, 1)
+    spread_quality_score: float     # clamp(1 - spread / max_spread, 0, 1)
+    liquidity_quality_score: float  # clamp(log10(vol / min_vol) / 2, 0, 1)
+    market_priority_score: float    # priority / 10.0
+    category_weight_score: float    # from category_weights config
     meets_threshold: bool
 
 
@@ -36,76 +38,112 @@ class ConfidenceScorer:
         cf = config.get("confidence", default={})
         w = cf.get("weights", {})
         raw_weights = {
-            "spike_magnitude": float(w.get("spike_magnitude", 0.35)),
-            "volume_confirmation": float(w.get("volume_confirmation", 0.30)),
-            "liquidity_score": float(w.get("liquidity_score", 0.20)),
-            "time_of_day": float(w.get("time_of_day", 0.15)),
+            "price_move_strength": float(w.get("price_move_strength", 0.30)),
+            "volume_spike_strength": float(w.get("volume_spike_strength", 0.20)),
+            "spread_quality": float(w.get("spread_quality", 0.15)),
+            "liquidity_quality": float(w.get("liquidity_quality", 0.15)),
+            "market_priority": float(w.get("market_priority", 0.10)),
+            "category_weight": float(w.get("category_weight", 0.10)),
         }
         total_w = sum(raw_weights.values())
         # Normalize weights to sum exactly to 1.0
         self._weights = {k: v / total_w for k, v in raw_weights.items()}
-        self._threshold = float(cf.get("min_threshold", 0.55))
+        self._threshold = float(cf.get("min_threshold", 0.65))
 
-        # Calibration parameters
-        self._spike_cap = 0.20      # 20% spike → score 1.0
-        self._vol_cap = 10.0        # 10x volume → score 1.0
-        self._depth_cap = 50000.0   # $50k depth → score 1.0
+        # Calibration: price move normalization
+        # clamp((move - min_move) / move_range, 0, 1)
+        sf = config.get("spike_fade", default={})
+        self._min_move = float(
+            sf.get("min_price_move_abs", sf.get("min_spike_magnitude", 0.12))
+        )
+        self._move_range = 0.08  # min_move + move_range = saturation point (20pp)
+
+        # Calibration: volume spike normalization
+        # clamp((vol_mult - min_mult) / mult_range, 0, 1)
+        self._min_vol_mult = float(
+            sf.get("min_volume_multiple", sf.get("volume_spike_multiplier", 2.0))
+        )
+        self._vol_mult_range = 3.0  # min_mult + range = saturation point (5x)
+
+        # Liquidity calibration: clamp(log10(vol / min_vol) / 2, 0, 1)
+        self._liquidity_min_vol = float(cf.get("liquidity_min_vol_usd", 500_000))
+
+        # Spread: clamp(1 - spread / max_spread, 0, 1)
+        self._max_spread = float(config.get("filters", "max_spread", default=0.10))
+
+        # Category tables
+        self._category_weights: dict[str, float] = config.get("category_weights", default={})
+        self._category_priorities: dict[str, int] = config.get("category_priorities", default={})
 
     def score(
         self,
         signal: SpikeFadeSignal,
-        orderbook_depth_usd: float = 0.0,
-        hour_utc: int | None = None,
+        spread: float = 0.0,
+        market_volume_usd: float = 0.0,
+        category: str = "",
     ) -> ConfidenceScore:
-        """
-        Score a signal. All sub-scores in [0.0, 1.0].
-        """
-        # 1. Spike magnitude: sigmoid-like normalization
-        spike_score = _clamp(signal.spike_magnitude_pct / self._spike_cap)
+        """Score a signal. All sub-scores are in [0.0, 1.0]."""
+        cat = category.lower()
 
-        # 2. Volume confirmation: log-normalized ratio
-        if signal.volume_spike_ratio > 1:
-            vol_score = _clamp(math.log(signal.volume_spike_ratio) / math.log(self._vol_cap))
+        # 1. Price move strength: clamp((move - min_move) / move_range, 0, 1)
+        move_score = _clamp(
+            (signal.spike_magnitude_pct - self._min_move) / self._move_range
+        )
+
+        # 2. Volume spike strength: clamp((vol_mult - min_mult) / mult_range, 0, 1)
+        vol_score = _clamp(
+            (signal.volume_spike_ratio - self._min_vol_mult) / self._vol_mult_range
+        )
+
+        # 3. Spread quality: clamp(1 - spread / max_spread, 0, 1)
+        if self._max_spread > 0:
+            spread_score = _clamp(1.0 - spread / self._max_spread)
         else:
-            vol_score = 0.0
+            spread_score = 1.0
 
-        # 3. Liquidity score: depth normalized
-        liq_score = _clamp(orderbook_depth_usd / self._depth_cap)
-
-        # 4. Time-of-day score: higher during US market hours (13:30–20:00 UTC)
-        if hour_utc is None:
-            import datetime
-            hour_utc = datetime.datetime.now(tz=datetime.timezone.utc).hour
-        if 13 <= hour_utc < 20:
-            tod_score = 1.0
-        elif 9 <= hour_utc < 13 or 20 <= hour_utc < 22:
-            tod_score = 0.7
+        # 4. Liquidity quality: clamp(log10(vol / min_vol) / 2, 0, 1)
+        if market_volume_usd > 0 and self._liquidity_min_vol > 0:
+            ratio = market_volume_usd / self._liquidity_min_vol
+            liq_score = _clamp(math.log10(max(ratio, 1e-9)) / 2.0)
         else:
-            tod_score = 0.4
+            liq_score = 0.0
+
+        # 5. Market priority: priority / 10.0
+        priority = self._category_priorities.get(cat, 5)
+        priority_score = _clamp(float(priority) / 10.0)
+
+        # 6. Category weight: value from config (already normalized [0..1])
+        cat_score = _clamp(float(self._category_weights.get(cat, 0.5)))
 
         total = (
-            self._weights["spike_magnitude"] * spike_score
-            + self._weights["volume_confirmation"] * vol_score
-            + self._weights["liquidity_score"] * liq_score
-            + self._weights["time_of_day"] * tod_score
+            self._weights["price_move_strength"] * move_score
+            + self._weights["volume_spike_strength"] * vol_score
+            + self._weights["spread_quality"] * spread_score
+            + self._weights["liquidity_quality"] * liq_score
+            + self._weights["market_priority"] * priority_score
+            + self._weights["category_weight"] * cat_score
         )
         total = _clamp(total)
 
         result = ConfidenceScore(
             total=total,
-            spike_magnitude_score=spike_score,
-            volume_confirmation_score=vol_score,
-            liquidity_score=liq_score,
-            time_of_day_score=tod_score,
+            price_move_score=move_score,
+            volume_spike_score=vol_score,
+            spread_quality_score=spread_score,
+            liquidity_quality_score=liq_score,
+            market_priority_score=priority_score,
+            category_weight_score=cat_score,
             meets_threshold=total >= self._threshold,
         )
         log.debug(
             "confidence.scored",
             total=round(total, 4),
-            spike=round(spike_score, 4),
+            move=round(move_score, 4),
             vol=round(vol_score, 4),
+            spread=round(spread_score, 4),
             liq=round(liq_score, 4),
-            tod=round(tod_score, 4),
+            priority=round(priority_score, 4),
+            cat=round(cat_score, 4),
             meets=result.meets_threshold,
         )
         return result

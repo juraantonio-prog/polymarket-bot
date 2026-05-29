@@ -6,7 +6,7 @@ All thresholds come from config/strategy.yaml.
 from __future__ import annotations
 
 import time
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from datetime import datetime, timezone
 from typing import Optional
 
@@ -27,7 +27,8 @@ class SpikeFadeSignal:
     spike_magnitude_pct: float  # fractional price change
     volume_spike_ratio: float   # current vol / avg vol
     days_to_expiry: float
-    detected_at: datetime = None
+    caution_zone: bool = False  # True when close to the expiry block threshold
+    detected_at: datetime = field(default=None)
 
     def __post_init__(self) -> None:
         if self.detected_at is None:
@@ -39,12 +40,20 @@ class SpikeFadeDetector:
 
     def __init__(self, config: Config) -> None:
         sf = config.get("spike_fade", default={})
-        self._min_spike = float(sf.get("min_spike_magnitude", 0.05))
-        self._baseline_window = float(sf.get("baseline_window_seconds", 600))
-        self._vol_spike_mult = float(sf.get("volume_spike_multiplier", 2.0))
+        # Support both new key names and old names for backwards compatibility
+        self._min_spike = float(
+            sf.get("min_price_move_abs", sf.get("min_spike_magnitude", 0.12))
+        )
+        self._baseline_window = float(
+            sf.get("window_seconds", sf.get("baseline_window_seconds", 300))
+        )
+        self._vol_spike_mult = float(
+            sf.get("min_volume_multiple", sf.get("volume_spike_multiplier", 2.0))
+        )
         self._min_volume_usd = float(sf.get("min_volume_usd", 5000))
-        self._cooldown_sec = float(sf.get("cooldown_seconds_per_market", 300))
+        self._cooldown_sec = float(sf.get("cooldown_seconds_per_market", 900))
         self._min_days = float(config.get("expiry", "min_days_to_expiry", default=30))
+        self._caution_days = float(config.get("expiry", "fade_caution_zone_days", default=14))
         self._max_spread = float(config.get("filters", "max_spread", default=0.10))
         # market_id -> timestamp of last emitted signal
         self._last_signal_ts: dict[str, float] = {}
@@ -79,7 +88,7 @@ class SpikeFadeDetector:
             )
             return None
 
-        # Time-to-expiry filter
+        # Time-to-expiry filter — hard block below min_days
         if days_to_expiry < self._min_days:
             log.info(
                 "spike_fade.no_signal",
@@ -137,7 +146,11 @@ class SpikeFadeDetector:
             return None
 
         # Volume spike filter — compare current tick vs rolling avg per tick
-        vol_ratio = (current_volume_usd / snapshot.avg_volume_per_tick) if snapshot.avg_volume_per_tick > 0 else 0.0
+        vol_ratio = (
+            current_volume_usd / snapshot.avg_volume_per_tick
+            if snapshot.avg_volume_per_tick > 0
+            else 0.0
+        )
         if vol_ratio < self._vol_spike_mult:
             log.info(
                 "spike_fade.no_signal",
@@ -152,7 +165,17 @@ class SpikeFadeDetector:
             )
             return None
 
-        # Determine direction: if price spiked UP → fade = sell YES (fade_yes)
+        # Caution zone: signal is valid but market is approaching the expiry block threshold
+        caution_zone = days_to_expiry < (self._min_days + self._caution_days)
+        if caution_zone:
+            log.warning(
+                "spike_fade.caution_zone",
+                market=snapshot.market_id,
+                days=round(days_to_expiry, 1),
+                caution_threshold=self._min_days + self._caution_days,
+            )
+
+        # Determine direction: price spiked UP → fade = sell YES (fade_yes)
         direction = "fade_yes" if snapshot.price_change_pct > 0 else "fade_no"
 
         signal = SpikeFadeSignal(
@@ -164,6 +187,7 @@ class SpikeFadeDetector:
             spike_magnitude_pct=magnitude_pct,
             volume_spike_ratio=vol_ratio,
             days_to_expiry=days_to_expiry,
+            caution_zone=caution_zone,
         )
         self._last_signal_ts[snapshot.market_id] = time.time()
         log.info(
@@ -172,6 +196,7 @@ class SpikeFadeDetector:
             direction=direction,
             magnitude_pct=round(magnitude_pct, 4),
             vol_ratio=round(vol_ratio, 2),
+            caution_zone=caution_zone,
             cooldown_until=round(self._cooldown_sec, 0),
         )
         return signal

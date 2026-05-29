@@ -54,7 +54,7 @@ def validate_config(ctx: click.Context) -> None:
             ("api", "clob_base_url"),
             ("api", "ws_url"),
             ("rate_limiter", "orders_per_minute"),
-            ("spike_fade", "min_spike_magnitude"),
+            ("spike_fade", "min_price_move_abs"),
             ("confidence", "min_threshold"),
             ("expiry", "min_days_to_expiry"),
             ("execution", "slippage_bps"),
@@ -178,6 +178,7 @@ def run_bot(ctx: click.Context, mode: str) -> None:
             detector = SpikeFadeDetector(config)
             scorer = ConfidenceScorer(config)
             engine = PaperEngine(config, db)
+            await engine.init()
             alerter = TelegramAlerter(config)
             ws = WSClient(config)
             cmd_handler = TelegramCommandHandler(db, time.time())
@@ -276,11 +277,42 @@ def run_bot(ctx: click.Context, mode: str) -> None:
 
                 print(f"[SIGNAL] {signal.direction} market={market_id} mag={round(signal.spike_magnitude_pct,4)}", flush=True)
 
+                # Extract category from Gamma API tags for confidence scoring
+                category = ""
+                tags = _m.get("tags", [])
+                if isinstance(tags, list) and tags:
+                    first = tags[0]
+                    if isinstance(first, dict):
+                        category = first.get("label", "").lower()
+                    elif isinstance(first, str):
+                        category = first.lower()
+
                 try:
-                    confidence = scorer.score(signal)
+                    confidence = scorer.score(
+                        signal=signal,
+                        spread=0.0,              # not available from WS feed
+                        market_volume_usd=market_vol_usd,
+                        category=category,
+                    )
                 except Exception as exc:
                     print(f"[SIGNAL ERROR] scorer.score failed: {exc}", flush=True)
                     raise
+
+                # Persist signal to DB so daily report can count skipped_signals
+                try:
+                    await db.execute(
+                        "INSERT INTO signals "
+                        "(market_id, direction, entry_price, confidence, "
+                        "spike_magnitude, volume_spike, days_to_expiry) "
+                        "VALUES (?, ?, ?, ?, ?, ?, ?)",
+                        (
+                            signal.market_id, signal.direction, signal.entry_price,
+                            confidence.total, signal.spike_magnitude_pct,
+                            signal.volume_spike_ratio, signal.days_to_expiry,
+                        ),
+                    )
+                except Exception as exc:
+                    log.warning("signal.db_insert_failed", error=str(exc))
 
                 print(f"[CONFIDENCE] total={round(confidence.total,4)} meets={confidence.meets_threshold}", flush=True)
 

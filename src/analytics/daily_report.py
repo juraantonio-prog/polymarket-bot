@@ -36,6 +36,8 @@ class DailyReporter:
             "max_loss_usd": metrics.max_loss_usd,
             "avg_latency_ms": metrics.avg_latency_ms,
             "sharpe_ratio": metrics.sharpe_ratio,
+            "signals_detected": metrics.signals_detected,
+            "skipped_signals": metrics.skipped_signals,
         }
 
         log.info("daily_report", **report)
@@ -46,5 +48,6 @@ class DailyReporter:
             win_rate=metrics.win_rate,
             total_pnl=metrics.total_pnl_usd,
             avg_latency_ms=metrics.avg_latency_ms,
+            skipped_signals=metrics.skipped_signals,
         )
         return report

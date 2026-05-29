@@ -1,34 +1,82 @@
 # Spike-fade strategy parameters
 spike_fade:
-  # Minimum price spike to trigger signal (fractional, e.g. 0.08 = 8pp)
-  min_spike_magnitude: 0.08
-  # Lookback window for baseline price (seconds)
-  baseline_window_seconds: 600
-  # Volume spike multiplier vs rolling average (paper trading: 0.5, live: 2.0+)
-  volume_spike_multiplier: 0.5
-  # Minimum rolling volume in USD for signal (low for paper trading)
+  # Minimum absolute price move to trigger signal (fractional, e.g. 0.12 = 12pp)
+  min_price_move_abs: 0.12
+  # Lookback window for baseline price computation (seconds)
+  window_seconds: 300
+  # Minimum volume spike multiplier vs rolling average
+  min_volume_multiple: 2.0
+  # Per-tick volume floor in USD (Gamma API volume is the real quality filter)
   min_volume_usd: 100
   # Minimum seconds between signals on the same market
-  cooldown_seconds_per_market: 300
+  cooldown_seconds_per_market: 900
 
 # Confidence scoring weights (must sum to 1.0)
 confidence:
   weights:
-    spike_magnitude: 0.35
-    volume_confirmation: 0.30
-    liquidity_score: 0.20
-    time_of_day: 0.15
-  # Minimum confidence to open position (paper trading: 0.40, live: 0.55+)
-  min_threshold: 0.55
-  # All sub-scores normalized to [0.0, 1.0]
+    price_move_strength: 0.30
+    volume_spike_strength: 0.20
+    spread_quality: 0.15
+    liquidity_quality: 0.15
+    market_priority: 0.10
+    category_weight: 0.10
+  # Minimum confidence to open a position
+  min_threshold: 0.65
+  # Minimum market volume (USD) for liquidity_quality score baseline
+  liquidity_min_vol_usd: 500000
+
+# Per-category quality weights [0.0, 1.0] — used directly as the category_weight sub-score
+category_weights:
+  politics: 1.00
+  elections: 1.00
+  geopolitics: 0.90
+  macro: 0.85
+  finance: 0.80
+  economics: 0.80
+  business: 0.75
+  law: 0.75
+  legal: 0.75
+  health: 0.70
+  ai: 0.70
+  science: 0.65
+  technology: 0.65
+  tech: 0.65
+  climate: 0.65
+  world: 0.60
+  news: 0.55
+  other: 0.50
+
+# Per-category priority [0..10] — maps to market_priority score via priority / 10.0
+category_priorities:
+  politics: 10
+  elections: 10
+  geopolitics: 8
+  macro: 7
+  finance: 7
+  economics: 7
+  business: 6
+  law: 6
+  legal: 6
+  health: 6
+  ai: 6
+  science: 5
+  technology: 5
+  tech: 5
+  climate: 5
+  world: 5
+  news: 4
+  other: 4
 
 # Time-to-expiry filter
 expiry:
+  # Reject markets with fewer than this many days to expiry
   min_days_to_expiry: 30
+  # Flag signals within this many days above the expiry block threshold (caution zone)
+  fade_caution_zone_days: 14
 
 # Market filtering
 filters:
-  # Minimum bid-ask spread tolerance (fractional)
+  # Maximum bid-ask spread (fractional)
   max_spread: 0.10
   # Minimum orderbook depth (USD)
   min_orderbook_depth_usd: 1000

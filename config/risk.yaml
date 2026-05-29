@@ -4,3 +4,9 @@ risk:
   notional_per_trade_usd: 100
   # Maximum total open exposure across all positions (USD)
   max_total_exposure_usd: 500
+  # Hard daily loss limit — bot stops opening new positions when daily PnL drops below this
+  max_daily_loss_usd: 250
+  # After this many consecutive losses, enter a cooling-off period
+  max_consecutive_losses: 4
+  # Duration of the consecutive-loss cooldown (seconds); 7200 = 2 hours
+  consecutive_loss_cooldown_seconds: 7200

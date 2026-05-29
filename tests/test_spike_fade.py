@@ -16,15 +16,16 @@ def _make_config(min_spike=0.05, vol_mult=2.0, min_vol=1000, min_days=30, max_sp
 
 
 def _make_detector(min_spike=0.05, vol_mult=2.0, min_vol=1000, min_days=30,
-                   max_spread=0.10, cooldown=0.0) -> SpikeFadeDetector:
+                   max_spread=0.10, cooldown=0.0, caution_days=14) -> SpikeFadeDetector:
     """Build a SpikeFadeDetector without Config, with cooldown=0 by default (no cooldown in tests)."""
     d = SpikeFadeDetector.__new__(SpikeFadeDetector)
     d._min_spike = min_spike
-    d._baseline_window = 600
+    d._baseline_window = 300
     d._vol_spike_mult = vol_mult
     d._min_volume_usd = min_vol
     d._cooldown_sec = cooldown
     d._min_days = min_days
+    d._caution_days = caution_days
     d._max_spread = max_spread
     d._last_signal_ts = {}
     return d
@@ -116,3 +117,22 @@ def test_cooldown_allows_after_expiry():
 
     sig2 = detector.detect(snap, days_to_expiry=60, current_volume_usd=5000.0, market_volume_usd=10_000_000)
     assert sig2 is not None
+
+
+def test_caution_zone_flagged():
+    """Signal between min_days and min_days+caution_days should have caution_zone=True."""
+    detector = _make_detector(min_days=30, caution_days=14)
+    snap = _make_snapshot(price_change_pct=0.10, avg_vol=1000.0)
+    # 38 days: above 30-day block but within 30+14=44 caution threshold
+    signal = detector.detect(snap, days_to_expiry=38, current_volume_usd=5000.0, market_volume_usd=10_000_000)
+    assert signal is not None
+    assert signal.caution_zone is True
+
+
+def test_caution_zone_not_flagged_far_from_expiry():
+    """Signal well above caution threshold should have caution_zone=False."""
+    detector = _make_detector(min_days=30, caution_days=14)
+    snap = _make_snapshot(price_change_pct=0.10, avg_vol=1000.0)
+    signal = detector.detect(snap, days_to_expiry=90, current_volume_usd=5000.0, market_volume_usd=10_000_000)
+    assert signal is not None
+    assert signal.caution_zone is False
