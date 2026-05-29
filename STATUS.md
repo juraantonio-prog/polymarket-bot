@@ -23,7 +23,7 @@ _Ažuriraj ovaj fajl nakon svake sesije i uploadaj zajedno s Word specom na poč
 | CLI komanda | `python /root/polymarket-bot/cli/main.py <cmd>` |
 | Prava DB | `/root/polymarket-bot/data/polymarket.db` |
 | sqlite3 putanja | `/usr/bin/sqlite3` (ne samo `sqlite3`!) |
-| Telegram token | u `.env` kao `TELEGRAM_BOT_TOKEN` (token osvježen 29.05.) |
+| Telegram token | u `.env` kao `TELEGRAM_BOT_TOKEN` (token zamijenjen 02.04. i 29.05.) |
 | Telegram chat_id | u `.env` kao `TELEGRAM_CHAT_ID` (bez minusa — private chat) |
 | Telegram bot | @pm_alfa_bot (PolymarketAlpha) |
 
@@ -78,6 +78,30 @@ _Ažuriraj ovaj fajl nakon svake sesije i uploadaj zajedno s Word specom na poč
 
 ---
 
+## Telegram komande
+
+| Komanda | Opis |
+|---------|------|
+| `/status` | Status bota, broj otvorenih/zatvorenih pozicija, ukupni P&L |
+| `/positions` | Lista otvorenih pozicija s entry cijenom i smjerom |
+| `/help` | Lista dostupnih komandi |
+| _automatski_ | Dnevni report svaki dan u 20:00 UTC |
+
+---
+
+## Statistika (29.05.2026.)
+
+| Razlog | Tradovi | Ukupni P&L | Avg P&L |
+|--------|---------|------------|---------|
+| stop_loss | 110 | -$2,958 | -$26.9 |
+| take_profit | 87 | +$2,908 | +$33.4 |
+| time_stop | 41 | +$90 | +$2.2 |
+| **UKUPNO** | **238** | **+$39** | — |
+
+_Napomena: rani tradovi imaju nepouzdane iznose zbog pnl_usd buga koji je ispravljen 29.05. Pouzdana statistika kreće od tog datuma._
+
+---
+
 ## Dozvoljene/blokirane kategorije
 
 **Dozvoljeno:** geopolitics, macro, politics, elections
@@ -119,16 +143,16 @@ Fix: `token_to_market` mapping, prices dict keyed by market_id.
 Telegram token revoked i zamijenjen novim (stari davao 401 Unauthorized).
 
 ### Fix 16 — 29.05. ✅
-Telegram token istekao/revoked — zamijenjen novim tokenom u `.env` na VPS-u.
+Telegram token opet revoked — zamijenjen novim token za @pm_alfa_bot.
 
 ### Fix 17 — 29.05. ✅
-pnl_usd kalkulacija koristila relativnu razliku umjesto apsolutne. `pnl_usd = size * (exit - entry)` — ispravno.
+**pnl_usd kalkulacija bila kriva** — dijelila s entry cijenom što je amplificiralo P&L za niske cijene (0.03 entry → 200x amplifikacija). Fix: pnl_pct = apsolutna razlika cijena (entry - exit_price), pnl_usd = size * pnl_pct. TP sada daje ~+$8, SL ~-$3.
 
 ### Fix 18 — 29.05. ✅
-Parametri zaošteni: confidence threshold 0.40→0.55, TP delta 0.06→0.08, SL delta 0.04→0.03.
+**Parametri podešeni** za bolju kvalitetu signala: confidence 0.40→0.55, TP 0.06→0.08, SL 0.04→0.03.
 
 ### Fix 19 — 29.05. ✅
-Telegram command handler dodan (`/status`, `/positions`, `/help`). Automatski dnevni report u 20:00 UTC. Handler radi kao background coroutine uz WS/exit/report loop.
+**Telegram command handler** dodan (`src/alerts/command_handler.py`). Komande: /status, /positions, /help. Automatski dnevni report u 20:00 UTC.
 
 ---
 
@@ -136,6 +160,14 @@ Telegram command handler dodan (`/status`, `/positions`, `/help`). Automatski dn
 
 ```bash
 /usr/bin/sqlite3 /root/polymarket-bot/data/polymarket.db "UPDATE positions SET status='closed' WHERE status='open';"
+```
+
+---
+
+## Brza provjera P&L (VPS)
+
+```bash
+/usr/bin/sqlite3 /root/polymarket-bot/data/polymarket.db "SELECT 'Open: ' || COUNT(*) FROM positions WHERE status='open'; SELECT 'Closed: ' || COUNT(*) || ' | PnL: $' || ROUND(SUM(CASE WHEN direction='fade_yes' THEN (entry_price - exit_price) * 100 ELSE (exit_price - entry_price) * 100 END), 2) FROM positions WHERE status='closed' AND exit_price IS NOT NULL;"
 ```
 
 ---
@@ -169,23 +201,27 @@ journalctl -u polymarket-bot --since "30 min ago" --no-pager | grep -E "SIGNAL|p
 /usr/bin/sqlite3 /root/polymarket-bot/data/polymarket.db "SELECT COUNT(*) FROM positions WHERE status='open';"
 
 # Telegram test:
-curl -s "https://api.telegram.org/bot${TELEGRAM_BOT_TOKEN}/sendMessage?chat_id=${TELEGRAM_CHAT_ID}&text=Test"
+curl -s "https://api.telegram.org/bot8581641008:AAFgqnexOa8nagl99ZE5zCvBh5VVtXJxbvE/getMe"
+
+# Zašto nema signala:
+journalctl -u polymarket-bot --since "1 hour ago" --no-pager | grep -E "no_signal|confidence|magnitude" | tail -20
 ```
 
 ---
 
 ## Sljedeći koraci
 
-- [ ] Potvrditi zatvaranje pozicija s P&L na Telegramu
-- [ ] Pratiti daily report s nenultim tradovima
-- [ ] Nakon 30 dana → Kelly Criterion, Bayesian scoring (@LunarResearcher)
+- [ ] Pratiti novi P&L s ispravnom kalkulacijom (od 29.05.)
+- [ ] Čekati 2-4 tjedna čistih podataka za validnu statistiku
+- [ ] Cilj: win rate > 52%, EV > 0
+- [ ] Nakon dovoljno čistih tradova → Kelly Criterion, Bayesian scoring (@LunarResearcher)
 - [ ] Faza 2: Random Forest model (@noisyb0y1)
 
 ---
 
 ## Kriterij za live micro-pilot
 
-- [ ] Min. 50 paper tradova s pozitivnom expectancy (EV > 0)
+- [ ] Min. 50 paper tradova s pozitivnom expectancy (EV > 0) — s čistim podacima od 29.05.
 - [ ] Win rate > 52%
 - [ ] Max drawdown < 15% paper bankrolla
 - [ ] Bot radi bez nadzora min. 14 dana bez kritičnih grešaka
