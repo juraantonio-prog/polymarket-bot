@@ -3,7 +3,7 @@ _Ažuriraj ovaj fajl nakon svake sesije i uploadaj zajedno s Word specom na poč
 
 ---
 
-## Zadnje ažuriranje: 01.04.2026.
+## Zadnje ažuriranje: 29.05.2026.
 
 ---
 
@@ -23,8 +23,9 @@ _Ažuriraj ovaj fajl nakon svake sesije i uploadaj zajedno s Word specom na poč
 | CLI komanda | `python /root/polymarket-bot/cli/main.py <cmd>` |
 | Prava DB | `/root/polymarket-bot/data/polymarket.db` |
 | sqlite3 putanja | `/usr/bin/sqlite3` (ne samo `sqlite3`!) |
-| Telegram token | u `.env` kao `TELEGRAM_BOT_TOKEN` (revoked token uklonjen iz gita 02.04.) |
+| Telegram token | u `.env` kao `TELEGRAM_BOT_TOKEN` (token osvježen 29.05.) |
 | Telegram chat_id | u `.env` kao `TELEGRAM_CHAT_ID` (bez minusa — private chat) |
+| Telegram bot | @pm_alfa_bot (PolymarketAlpha) |
 
 ---
 
@@ -34,15 +35,17 @@ _Ažuriraj ovaj fajl nakon svake sesije i uploadaj zajedno s Word specom na poč
 |-|--------|
 | ✅ | Bot radi 24/7 na VPS-u |
 | ✅ | systemd servis aktivan i enabled |
-| ✅ | Telegram alertovi rade (novi token 01.04.) |
+| ✅ | Telegram alertovi rade (token osvježen 29.05.) |
 | ✅ | WebSocket prima live price updateove |
 | ✅ | Signal detection radi |
 | ✅ | Paper engine otvara pozicije |
 | ✅ | Exit logika implementirana (TP/SL/timeout svakih 30s) |
 | ✅ | Cooldown 300s per market |
 | ✅ | Sports/crypto/entertainment blokirani po keyword filteru |
-| ✅ | **30 dana paper trading sat kreće od 29.03.2026.** |
-| ⏳ | Monitoring — čekamo zatvaranje prvih pozicija s P&L |
+| ✅ | pnl_usd kalkulacija ispravljena (29.05.) |
+| ✅ | Telegram command handler implementiran (/status, /positions, /help) |
+| ✅ | Automatski dnevni report u 20:00 UTC |
+| ✅ | **239 zatvorenih tradova, P&L: +$39.45** |
 
 ---
 
@@ -55,7 +58,7 @@ _Ažuriraj ovaj fajl nakon svake sesije i uploadaj zajedno s Word specom na poč
 - Max otvorenih pozicija: 5
 - Cooldown per market: 300s (5 min)
 - Live trading: **ONEMOGUĆEN**
-- **Cilj: 50+ tradova do ~29.04.2026.**
+- **239 tradova zatvoreno do 29.05.2026.**
 
 ---
 
@@ -67,10 +70,10 @@ _Ažuriraj ovaj fajl nakon svake sesije i uploadaj zajedno s Word specom na poč
 | Rolling window | 600s (10 min) |
 | Volume filter | market_volume_usd iz Gamma API |
 | Min. market volume | $500,000 |
-| Take profit | ±0.06 od entry |
-| Stop loss | ∓0.04 od entry |
+| Take profit | ±0.08 od entry _(promijenjeno 29.05.)_ |
+| Stop loss | ∓0.03 od entry _(promijenjeno 29.05.)_ |
 | Max hold | 2400s (40 min) |
-| Min. confidence | 0.40 |
+| Min. confidence | 0.55 _(promijenjeno 29.05.)_ |
 | Exit check interval | 30s |
 
 ---
@@ -114,6 +117,18 @@ Fix: `token_to_market` mapping, prices dict keyed by market_id.
 
 ### Fix 15 — 01.04. ✅
 Telegram token revoked i zamijenjen novim (stari davao 401 Unauthorized).
+
+### Fix 16 — 29.05. ✅
+Telegram token istekao/revoked — zamijenjen novim tokenom u `.env` na VPS-u.
+
+### Fix 17 — 29.05. ✅
+pnl_usd kalkulacija koristila relativnu razliku umjesto apsolutne. `pnl_usd = size * (exit - entry)` — ispravno.
+
+### Fix 18 — 29.05. ✅
+Parametri zaošteni: confidence threshold 0.40→0.55, TP delta 0.06→0.08, SL delta 0.04→0.03.
+
+### Fix 19 — 29.05. ✅
+Telegram command handler dodan (`/status`, `/positions`, `/help`). Automatski dnevni report u 20:00 UTC. Handler radi kao background coroutine uz WS/exit/report loop.
 
 ---
 
