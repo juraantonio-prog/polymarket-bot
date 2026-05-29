@@ -170,6 +170,7 @@ def run_bot(ctx: click.Context, mode: str) -> None:
         from src.strategy.confidence import ConfidenceScorer
         from src.execution.paper_engine import PaperEngine
         from src.alerts.telegram import TelegramAlerter
+        from src.alerts.command_handler import TelegramCommandHandler
         import datetime, time
 
         async with Database(config.db_path) as db:
@@ -179,6 +180,7 @@ def run_bot(ctx: click.Context, mode: str) -> None:
             engine = PaperEngine(config, db)
             alerter = TelegramAlerter(config)
             ws = WSClient(config)
+            cmd_handler = TelegramCommandHandler(db, time.time())
 
             # Market discovery
             async with GammaClient(config) as gamma:
@@ -350,7 +352,7 @@ def run_bot(ctx: click.Context, mode: str) -> None:
                         except Exception as exc:
                             log.error("daily_report_error", error=str(exc))
 
-            await asyncio.gather(ws.start(), exit_loop(), daily_report_loop())
+            await asyncio.gather(ws.start(), exit_loop(), daily_report_loop(), cmd_handler.poll_loop())
 
     try:
         _run(_run_paper())
