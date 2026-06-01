@@ -181,7 +181,9 @@ def run_bot(ctx: click.Context, mode: str) -> None:
             await engine.init()
             alerter = TelegramAlerter(config)
             ws = WSClient(config)
-            cmd_handler = TelegramCommandHandler(db, time.time())
+            cmd_handler = TelegramCommandHandler(
+                db, time.time(), engine._risk_guard, engine._threshold
+            )
 
             # Market discovery
             async with GammaClient(config) as gamma:
@@ -376,7 +378,7 @@ def run_bot(ctx: click.Context, mode: str) -> None:
                 while True:
                     await asyncio.sleep(60)
                     now = datetime.datetime.now(tz=datetime.timezone.utc)
-                    if now.hour == 13 and now.minute == 0 and last_sent != now.date():
+                    if now.hour == 20 and now.minute == 0 and last_sent != now.date():
                         try:
                             await reporter.run()
                             last_sent = now.date()
