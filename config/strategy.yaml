@@ -83,8 +83,8 @@ filters:
   # Only trade YES/NO binary markets
   binary_only: true
   # Entry price bounds — markets near 0 or 1 have no room for fade
-  min_entry_price: 0.10
-  max_entry_price: 0.90
+  min_entry_price: 0.05
+  max_entry_price: 0.95
   # Allowed market categories (lowercase). Markets not matching any tag are rejected.
   allowed_categories:
     - politics
