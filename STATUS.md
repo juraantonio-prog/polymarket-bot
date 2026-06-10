@@ -3,7 +3,7 @@ _Ažuriraj ovaj fajl nakon svake sesije i uploadaj zajedno s Word specom na poč
 
 ---
 
-## Zadnje ažuriranje: 01.06.2026.
+## Zadnje ažuriranje: 10.06.2026.
 
 ---
 
@@ -40,15 +40,18 @@ _Ažuriraj ovaj fajl nakon svake sesije i uploadaj zajedno s Word specom na poč
 | ✅ | Signal detection radi |
 | ✅ | Paper engine otvara pozicije |
 | ✅ | Exit logika implementirana (TP/SL/timeout svakih 30s) |
-| ✅ | Cooldown 300s per market |
+| ✅ | Cooldown 900s per market |
 | ✅ | Sports/crypto/entertainment blokirani po keyword filteru |
 | ✅ | pnl_usd kalkulacija ispravljena (29.05.) |
-| ✅ | 6-faktorski confidence scoring normaliziran [0.0, 1.0] (29.05.) |
-| ✅ | RiskGuard: max $250 dnevni gubitak, 4 uzastopna gubitka → 2h cooldown (29.05.) |
-| ✅ | Time-to-expiry filter: min 30 dana do isteka (29.05.) |
-| ✅ | Telegram command handler: /status, /positions, /help (29.05.) |
+| ✅ | 6-faktorski confidence scoring normaliziran [0.0, 1.0] |
+| ✅ | RiskGuard: max $250 dnevni gubitak, 4 uzastopna gubitka → 2h cooldown |
+| ✅ | Time-to-expiry filter: min 30 dana do isteka |
+| ✅ | Telegram command handler: /status, /positions, /help |
 | ✅ | Automatski dnevni report u 20:00 UTC |
-| ✅ | /status prikazuje P&L od 29.05. + ukupni P&L + win rate + risk status + signal info (01.06.) |
+| ✅ | Entry price filter: odbij tržišta izvan [0.05, 0.95] (10.06.) |
+| ✅ | /status: prosječni holding time od 29.05. (10.06.) |
+| ✅ | Dnevni report: broj signala odbijenih zbog entry price (10.06.) |
+| ⏳ | Čekamo signale s novim parametrima |
 
 ---
 
@@ -59,9 +62,10 @@ _Ažuriraj ovaj fajl nakon svake sesije i uploadaj zajedno s Word specom na poč
 - Paper bankroll: $10,000
 - Nominalni iznos po tradu: $100
 - Max otvorenih pozicija: 5
-- Cooldown per market: 300s (5 min)
+- Cooldown per market: 900s (15 min)
 - Live trading: **ONEMOGUĆEN**
 - Pouzdana statistika kreće od: **29.05.2026.**
+- Tradovi od 29.05.: **12** | Win rate: **25%** | P&L: **-$0.09**
 
 ---
 
@@ -69,16 +73,17 @@ _Ažuriraj ovaj fajl nakon svake sesije i uploadaj zajedno s Word specom na poč
 
 | Parametar | Vrijednost |
 |-----------|-----------|
-| Min. pomak cijene | 12pp (spec v2.0) |
+| Min. pomak cijene | 0.08 (sniženo 10.06.) |
 | Rolling window | 300s (5 min) |
-| Volume filter | min_volume_multiple: 2.0x |
+| Min. volume multiple | 1.5x (sniženo 10.06.) |
 | Min. market volume | $500,000 |
 | Take profit | ±0.08 od entry |
 | Stop loss | ∓0.03 od entry |
 | Max hold | 2400s (40 min) |
-| Min. confidence | 0.65 (6-faktorski model) |
+| Min. confidence | 0.55 (sniženo 10.06.) |
 | Cooldown per market | 900s (15 min) |
 | Min. days to expiry | 30 dana |
+| Entry price filter | [0.05, 0.95] — odbij izvan raspona (10.06.) |
 | Exit check interval | 30s |
 
 ---
@@ -87,8 +92,8 @@ _Ažuriraj ovaj fajl nakon svake sesije i uploadaj zajedno s Word specom na poč
 
 | Faktor | Formula | Weight |
 |--------|---------|--------|
-| price_move_strength | clamp((move - 0.12) / 0.08, 0, 1) | 0.30 |
-| volume_spike_strength | clamp((vol_mult - 2.0) / 3.0, 0, 1) | 0.20 |
+| price_move_strength | clamp((move - 0.08) / 0.08, 0, 1) | 0.30 |
+| volume_spike_strength | clamp((vol_mult - 1.5) / 3.0, 0, 1) | 0.20 |
 | spread_quality | clamp(1 - spread_bps/max_spread, 0, 1) | 0.15 |
 | liquidity_quality | clamp(log10(vol/min_vol) / 2, 0, 1) | 0.15 |
 | market_priority | priority / 10.0 | 0.10 |
@@ -111,23 +116,23 @@ _Ažuriraj ovaj fajl nakon svake sesije i uploadaj zajedno s Word specom na poč
 
 | Komanda | Opis |
 |---------|------|
-| `/status` | P&L od 29.05. + ukupni P&L + win rate + tradovi danas + risk status + signali + countdown do reporta |
+| `/status` | P&L od 29.05. + ukupni P&L + win rate + **avg holding time** + tradovi danas + risk status + signali + countdown |
 | `/positions` | Lista otvorenih pozicija s entry cijenom i smjerom |
 | `/help` | Lista dostupnih komandi |
-| _automatski_ | Dnevni report svaki dan u 20:00 UTC |
+| _automatski_ | Dnevni report svaki dan u 20:00 UTC (22:00 tvoje vrijeme) — uključuje **entry_price_skipped** |
 
 ---
 
-## Statistika (podaci do 29.05. — djelomično nepouzdani)
+## Statistika (od 29.05.2026. — čisti podaci)
 
-| Razlog | Tradovi | Ukupni P&L | Avg P&L |
-|--------|---------|------------|---------|
-| stop_loss | 110 | -$2,958 | -$26.9 |
-| take_profit | 87 | +$2,908 | +$33.4 |
-| time_stop | 41 | +$90 | +$2.2 |
-| **UKUPNO** | **238** | **+$39** | — |
+| Razlog | Tradovi | P&L |
+|--------|---------|-----|
+| take_profit | 3 | +$2.20 |
+| stop_loss | 2 | -$1.36 |
+| time_stop | 7 | -$0.93 |
+| **UKUPNO** | **12** | **-$0.09** |
 
-_Pouzdana statistika kreće od 29.05.2026. — koristiti /status za čiste podatke._
+Win rate: 25% (3/12) — ispod cilja 52%. Parametri olabavljeni 10.06., entry price filter proširen na [0.05, 0.95].
 
 ---
 
@@ -143,59 +148,30 @@ _Pouzdana statistika kreće od 29.05.2026. — koristiti /status za čiste podat
 
 ## Povijest fixeva
 
-### Fix 1-4 — 26-29.03. ✅
-markets.yaml kreiran, WS subscription tip ispravljen, price updateovi potvrđeni.
+### Fix 1-15 — 26.03–01.04. ✅
+WS fix, exit logika, cooldown, keyword filter, Telegram token, pnl_usd.
 
-### Fix 5-7 — 30.03. ✅
-Deque overflow, volume filter bug, spike threshold 12pp→8pp.
+### Fix 16-19 — 29.05. ✅
+Telegram token, pnl_usd kalkulacija, parametri (confidence 0.55, TP 0.08, SL 0.03), command handler.
 
-### Fix 8-9 — 31.03. ✅
-Vol_spike filter, confidence threshold lanac (paper_engine→telegram).
-
-### Fix 10 — 31.03. ✅
-spike_fade.signal nije pozivao paper_engine — ispravan await lanac.
-
-### Fix 11 — 31.03. ✅
-Telegram chat_id minus uklonjen.
-
-### Fix 12 — 31.03. ✅
-Cooldown 300s per market implementiran.
-
-### Fix 13 — 31.03. ✅
-Crypto/entertainment/sports keyword filter dodan.
-
-### Fix 14 — 01.04. ✅
-Exit logika nije radila — token_to_market mapping fix.
-
-### Fix 15 — 01.04. ✅
-Telegram token revoked i zamijenjen novim.
-
-### Fix 16 — 29.05. ✅
-Telegram token opet zamijenjen.
-
-### Fix 17 — 29.05. ✅
-pnl_usd kalkulacija ispravljena — apsolutna razlika cijena × 100.
-
-### Fix 18 — 29.05. ✅
-Parametri podešeni: confidence 0.55, TP 0.08, SL 0.03.
-
-### Fix 19 — 29.05. ✅
-Telegram command handler dodan: /status, /positions, /help + dnevni report 20:00 UTC.
-
-### Fix 20 — 29.05. ✅
-6-faktorski confidence scoring normaliziran na [0.0, 1.0] prema specu v2.0.
-
-### Fix 21 — 29.05. ✅
-RiskGuard implementiran: max $250 dnevni gubitak, 4 uzastopna gubitka → 2h cooldown.
-
-### Fix 22 — 29.05. ✅
-Time-to-expiry filter: odbij tržišta s <30 dana do isteka. Caution zone: 14 dana.
-
-### Fix 23 — 29.05. ✅
-Slippage 100 bps potvrđen u paper_engine.
+### Fix 20-23 — 29.05. ✅
+6-faktorski confidence scoring, RiskGuard, time-to-expiry filter, slippage 100bps.
 
 ### Fix 24 — 01.06. ✅
-/status proširen: P&L od 29.05. + ukupni P&L + win rate + tradovi danas + risk status (dnevni gubitak, uzastopni gubici, cooldown) + signal info + countdown do dnevnog reporta.
+/status proširen: P&L split, win rate, risk status, signal info, countdown.
+
+### Fix 25 — 10.06. ✅
+Parametri olabavljeni: min_price_move 0.12→0.08, min_volume_multiple 2.0→1.5, confidence threshold 0.65→0.55.
+
+### Fix 26 — 10.06. ✅
+Entry price filter dodan: odbij signal ako entry_price izvan [0.10, 0.90]. Nova DB tablica `entry_price_rejections`.
+
+### Fix 27 — 10.06. ✅
+Entry price bounds prošireni: [0.10, 0.90] → [0.05, 0.95].
+
+### Fix 28 — 10.06. ✅
+/status: dodan prosječni holding time za zatvorene tradove od 29.05.
+Dnevni report: dodan `entry_price_skipped` — broj signala odbijenih zbog entry cijene izvan raspona.
 
 ---
 
@@ -210,7 +186,7 @@ Slippage 100 bps potvrđen u paper_engine.
 ## Brza provjera P&L (VPS)
 
 ```bash
-/usr/bin/sqlite3 /root/polymarket-bot/data/polymarket.db "SELECT 'Open: ' || COUNT(*) FROM positions WHERE status='open'; SELECT 'Closed: ' || COUNT(*) || ' | PnL: $' || ROUND(SUM(CASE WHEN direction='fade_yes' THEN (entry_price - exit_price) * 100 ELSE (exit_price - entry_price) * 100 END), 2) FROM positions WHERE status='closed' AND exit_price IS NOT NULL;"
+/usr/bin/sqlite3 /root/polymarket-bot/data/polymarket.db "SELECT 'Open: ' || COUNT(*) FROM positions WHERE status='open'; SELECT 'Closed: ' || COUNT(*) || ' | PnL: $' || ROUND(SUM(CASE WHEN direction='fade_yes' THEN (entry_price - exit_price) * 100 ELSE (exit_price - entry_price) * 100 END), 2) FROM positions WHERE status='closed' AND exit_price IS NOT NULL AND opened_at >= '2026-05-29';"
 ```
 
 ---
@@ -237,23 +213,22 @@ systemctl restart polymarket-bot
 # Status:
 systemctl status polymarket-bot
 
-# Signali i pozicije:
-journalctl -u polymarket-bot --since "30 min ago" --no-pager | grep -E "SIGNAL|paper\.|exit|closed" | tail -20
+# Zašto nema signala:
+journalctl -u polymarket-bot --since "1 hour ago" --no-pager | grep -E "signal|skip|entry_price" | tail -30
 
 # Otvorene pozicije:
 /usr/bin/sqlite3 /root/polymarket-bot/data/polymarket.db "SELECT COUNT(*) FROM positions WHERE status='open';"
 
-# Zašto nema signala:
-journalctl -u polymarket-bot --since "1 hour ago" --no-pager | grep -E "no_signal|confidence|magnitude" | tail -20
+# Entry price rejections danas:
+/usr/bin/sqlite3 /root/polymarket-bot/data/polymarket.db "SELECT COUNT(*) FROM entry_price_rejections WHERE rejected_at >= date('now');"
 ```
 
 ---
 
 ## Sljedeći koraci
 
-- [ ] Pratiti P&L od 29.05. putem /status na Telegramu
-- [ ] Čekati 2-4 tjedna čistih podataka (cilj: 50+ tradova)
-- [ ] Cilj: win rate > 52%, EV > 0
+- [ ] Pratiti signale s novim entry price filterom i olabavljenim parametrima
+- [ ] Cilj: 50+ čistih tradova, win rate > 52%, EV > 0
 - [ ] Kelly Criterion + Bayesian scoring (@LunarResearcher)
 - [ ] Faza 2: Random Forest model (@noisyb0y1)
 
