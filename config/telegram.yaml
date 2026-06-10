@@ -30,6 +30,7 @@ alerts:
       📋 *DAILY REPORT*
       Date: {date}
       Trades: {total_trades} | Skipped signals: {skipped_signals}
+      Entry price filtered: {entry_price_skipped}
       Win Rate: {win_rate:.1%}
       PnL: ${total_pnl:+.2f}
       Avg Latency: {avg_latency_ms:.0f}ms

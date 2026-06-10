@@ -133,6 +133,7 @@ class TelegramAlerter:
     async def send_daily_report(
         self, date: str, total_trades: int, win_rate: float,
         total_pnl: float, avg_latency_ms: float, skipped_signals: int = 0,
+        entry_price_skipped: int = 0,
     ) -> bool:
         text = self._render(
             "daily_report",
@@ -142,5 +143,6 @@ class TelegramAlerter:
             total_pnl=total_pnl,
             avg_latency_ms=avg_latency_ms,
             skipped_signals=skipped_signals,
+            entry_price_skipped=entry_price_skipped,
         )
         return await self.send_raw(text)

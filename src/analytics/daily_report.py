@@ -38,6 +38,7 @@ class DailyReporter:
             "sharpe_ratio": metrics.sharpe_ratio,
             "signals_detected": metrics.signals_detected,
             "skipped_signals": metrics.skipped_signals,
+            "entry_price_skipped": metrics.entry_price_skipped,
         }
 
         log.info("daily_report", **report)
@@ -49,5 +50,6 @@ class DailyReporter:
             total_pnl=metrics.total_pnl_usd,
             avg_latency_ms=metrics.avg_latency_ms,
             skipped_signals=metrics.skipped_signals,
+            entry_price_skipped=metrics.entry_price_skipped,
         )
         return report

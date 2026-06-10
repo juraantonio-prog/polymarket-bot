@@ -231,6 +231,10 @@ def run_bot(ctx: click.Context, mode: str) -> None:
                     if tid and mid:
                         token_to_market[str(tid)] = mid
 
+            # Entry price bounds — loaded once, used in on_message closure
+            _ep_min = float(config.get("filters", "min_entry_price", default=0.10))
+            _ep_max = float(config.get("filters", "max_entry_price", default=0.90))
+
             # WS message handler
             async def on_message(msg: dict) -> None:
                 asset_id = msg.get("asset_id", msg.get("market", ""))
@@ -266,6 +270,24 @@ def run_bot(ctx: click.Context, mode: str) -> None:
 
                 snap = tracker.get_snapshot(market_id, asset_id)
                 if snap is None:
+                    return
+
+                # Entry price filter — markets near 0 or 1 have no room for fade
+                if snap.current_price < _ep_min or snap.current_price > _ep_max:
+                    log.info(
+                        "spike_fade.no_signal",
+                        market=market_id,
+                        reason="entry_price",
+                        price=round(snap.current_price, 4),
+                        bounds=[_ep_min, _ep_max],
+                    )
+                    try:
+                        await db.execute(
+                            "INSERT INTO entry_price_rejections (market_id, entry_price) VALUES (?, ?)",
+                            (market_id, snap.current_price),
+                        )
+                    except Exception as exc:
+                        log.warning("entry_price_rejection.db_failed", error=str(exc))
                     return
 
                 signal = detector.detect(

@@ -78,9 +78,17 @@ CREATE TABLE IF NOT EXISTS latency_log (
     recorded_at TEXT DEFAULT (datetime('now'))
 );
 
+CREATE TABLE IF NOT EXISTS entry_price_rejections (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    market_id TEXT NOT NULL,
+    entry_price REAL NOT NULL,
+    rejected_at TEXT DEFAULT (datetime('now'))
+);
+
 CREATE INDEX IF NOT EXISTS idx_price_ticks_market ON price_ticks(market_id, recorded_at);
 CREATE INDEX IF NOT EXISTS idx_positions_market ON positions(market_id, status);
 CREATE INDEX IF NOT EXISTS idx_signals_market ON signals(market_id, created_at);
+CREATE INDEX IF NOT EXISTS idx_entry_rejections_at ON entry_price_rejections(rejected_at);
 """
 
 

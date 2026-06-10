@@ -1,11 +1,11 @@
 # Spike-fade strategy parameters
 spike_fade:
-  # Minimum absolute price move to trigger signal (fractional, e.g. 0.12 = 12pp)
-  min_price_move_abs: 0.12
+  # Minimum absolute price move to trigger signal (fractional, e.g. 0.08 = 8pp)
+  min_price_move_abs: 0.08
   # Lookback window for baseline price computation (seconds)
   window_seconds: 300
   # Minimum volume spike multiplier vs rolling average
-  min_volume_multiple: 2.0
+  min_volume_multiple: 1.5
   # Per-tick volume floor in USD (Gamma API volume is the real quality filter)
   min_volume_usd: 100
   # Minimum seconds between signals on the same market
@@ -21,7 +21,7 @@ confidence:
     market_priority: 0.10
     category_weight: 0.10
   # Minimum confidence to open a position
-  min_threshold: 0.65
+  min_threshold: 0.55
   # Minimum market volume (USD) for liquidity_quality score baseline
   liquidity_min_vol_usd: 500000
 
@@ -82,6 +82,9 @@ filters:
   min_orderbook_depth_usd: 1000
   # Only trade YES/NO binary markets
   binary_only: true
+  # Entry price bounds — markets near 0 or 1 have no room for fade
+  min_entry_price: 0.10
+  max_entry_price: 0.90
   # Allowed market categories (lowercase). Markets not matching any tag are rejected.
   allowed_categories:
     - politics

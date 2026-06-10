@@ -105,6 +105,18 @@ class TelegramCommandHandler:
         clean_wins = int(clean_row["wins"] or 0) if clean_row else 0
         clean_wr = clean_wins / clean_cnt if clean_cnt > 0 else 0.0
 
+        # --- Prosjecni holding time od 29.05. ---
+        holding_row = await self._db.fetchone(
+            "SELECT AVG((julianday(closed_at) - julianday(opened_at)) * 1440) as avg_min "
+            "FROM positions WHERE status = 'closed' AND closed_at >= ?",
+            (_CLEAN_DATA_FROM,),
+        )
+        avg_hold_min = float(holding_row["avg_min"]) if holding_row and holding_row["avg_min"] else 0.0
+        if avg_hold_min >= 60:
+            avg_hold_str = f"{avg_hold_min / 60:.1f}h"
+        else:
+            avg_hold_str = f"{avg_hold_min:.0f}min"
+
         # --- P&L ukupno (sve zatvorene pozicije) ---
         total_row = await self._db.fetchone(
             "SELECT COALESCE(SUM(pnl_usd), 0) as pnl FROM positions WHERE status = 'closed'"
@@ -204,7 +216,8 @@ class TelegramCommandHandler:
             f"⚠️ *P&L ukupno* _(uklj. stare podatke)_: "
             f"*{_sign(total_pnl)}{total_pnl:.2f} USD*\n"
             f"\U0001f4ca *Win rate od {_CLEAN_DATA_LABEL}*: "
-            f"*{clean_wr * 100:.1f}%*  ({clean_wins}/{clean_cnt})\n\n"
+            f"*{clean_wr * 100:.1f}%*  ({clean_wins}/{clean_cnt})\n"
+            f"⏱ *Avg holding time od {_CLEAN_DATA_LABEL}*: *{avg_hold_str}*\n\n"
             f"\U0001f4c5 *Danas*\n"
             f"  Zatvoreni tradovi: *{today_cnt}*\n"
             f"  Najveci dobitak: *{_sign(today_max_win)}{today_max_win:.2f} USD*\n"

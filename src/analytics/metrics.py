@@ -24,6 +24,7 @@ class PerformanceMetrics:
     sharpe_ratio: Optional[float]
     signals_detected: int
     skipped_signals: int
+    entry_price_skipped: int
 
 
 class MetricsCalculator:
@@ -81,6 +82,20 @@ class MetricsCalculator:
         signals_detected = int(sig_row["cnt"]) if sig_row and sig_row["cnt"] else 0
         skipped_signals = max(0, signals_detected - len(pnls))
 
+        # Entry price rejections for the date window
+        where_ep = "WHERE 1=1"
+        params_ep: tuple = ()
+        if date_from:
+            where_ep += " AND rejected_at >= ?"
+            params_ep = params_ep + (date_from,)
+        if date_to:
+            where_ep += " AND rejected_at <= ?"
+            params_ep = params_ep + (date_to,)
+        ep_row = await self._db.fetchone(
+            f"SELECT COUNT(*) as cnt FROM entry_price_rejections {where_ep}", params_ep
+        )
+        entry_price_skipped = int(ep_row["cnt"]) if ep_row and ep_row["cnt"] else 0
+
         return PerformanceMetrics(
             total_trades=len(pnls),
             winning_trades=len(wins),
@@ -94,4 +109,5 @@ class MetricsCalculator:
             sharpe_ratio=sharpe,
             signals_detected=signals_detected,
             skipped_signals=skipped_signals,
+            entry_price_skipped=entry_price_skipped,
         )
