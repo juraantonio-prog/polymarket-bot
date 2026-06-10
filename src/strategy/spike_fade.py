@@ -55,8 +55,16 @@ class SpikeFadeDetector:
         self._min_days = float(config.get("expiry", "min_days_to_expiry", default=30))
         self._caution_days = float(config.get("expiry", "fade_caution_zone_days", default=14))
         self._max_spread = float(config.get("filters", "max_spread", default=0.10))
+        self._news_shock_threshold = float(sf.get("news_shock_threshold", 0.15))
         # market_id -> timestamp of last emitted signal
         self._last_signal_ts: dict[str, float] = {}
+        # Set by detect() on every call — reason for last None return, "" on signal
+        self.last_skip_reason: str = ""
+
+    @staticmethod
+    def compute_ev(confidence: float, tp_delta: float, sl_delta: float) -> float:
+        """Expected value of a single trade given confidence and TP/SL price deltas."""
+        return (confidence * tp_delta) - ((1.0 - confidence) * sl_delta)
 
     def detect(
         self,
@@ -68,8 +76,9 @@ class SpikeFadeDetector:
     ) -> Optional[SpikeFadeSignal]:
         """
         Evaluate a market snapshot for spike-fade signal.
-        Returns signal or None.
+        Returns signal or None. Sets self.last_skip_reason on every call.
         """
+        self.last_skip_reason = ""
         magnitude_pct = abs(snapshot.price_change_pct)
         magnitude_pp = round(magnitude_pct * 100, 2)
         gap_pp = round((self._min_spike - magnitude_pct) * 100, 2)
@@ -79,6 +88,7 @@ class SpikeFadeDetector:
         last_ts = self._last_signal_ts.get(snapshot.market_id, 0.0)
         elapsed = now - last_ts
         if elapsed < self._cooldown_sec:
+            self.last_skip_reason = "cooldown"
             log.info(
                 "spike_fade.no_signal",
                 market=snapshot.market_id,
@@ -90,6 +100,7 @@ class SpikeFadeDetector:
 
         # Time-to-expiry filter — hard block below min_days
         if days_to_expiry < self._min_days:
+            self.last_skip_reason = "expiry"
             log.info(
                 "spike_fade.no_signal",
                 market=snapshot.market_id,
@@ -104,6 +115,7 @@ class SpikeFadeDetector:
 
         # Spread filter
         if spread > self._max_spread:
+            self.last_skip_reason = "spread"
             log.info(
                 "spike_fade.no_signal",
                 market=snapshot.market_id,
@@ -118,6 +130,7 @@ class SpikeFadeDetector:
 
         # Minimum volume filter — use Gamma API market volume, not WS tick sizes
         if market_volume_usd < self._min_volume_usd:
+            self.last_skip_reason = "market_volume"
             log.info(
                 "spike_fade.no_signal",
                 market=snapshot.market_id,
@@ -130,8 +143,9 @@ class SpikeFadeDetector:
             )
             return None
 
-        # Magnitude filter
+        # Magnitude filter — minimum threshold
         if magnitude_pct < self._min_spike:
+            self.last_skip_reason = "magnitude"
             log.info(
                 "spike_fade.no_signal",
                 market=snapshot.market_id,
@@ -145,6 +159,19 @@ class SpikeFadeDetector:
             )
             return None
 
+        # News shock filter — move too large to be a mean-reversion fade (likely news-driven)
+        if magnitude_pct > self._news_shock_threshold:
+            self.last_skip_reason = "news_shock"
+            log.info(
+                "spike_fade.no_signal",
+                market=snapshot.market_id,
+                reason="news_shock",
+                move_pp=magnitude_pp,
+                threshold_pp=round(self._news_shock_threshold * 100, 2),
+                price=round(snapshot.current_price, 4),
+            )
+            return None
+
         # Volume spike filter — compare current tick vs rolling avg per tick
         vol_ratio = (
             current_volume_usd / snapshot.avg_volume_per_tick
@@ -152,6 +179,7 @@ class SpikeFadeDetector:
             else 0.0
         )
         if vol_ratio < self._vol_spike_mult:
+            self.last_skip_reason = "vol_spike"
             log.info(
                 "spike_fade.no_signal",
                 market=snapshot.market_id,

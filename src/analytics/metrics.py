@@ -20,6 +20,10 @@ class PerformanceMetrics:
     avg_pnl_usd: float
     max_win_usd: float
     max_loss_usd: float
+    avg_win_usd: float
+    avg_loss_usd: float
+    expectancy_per_trade: float
+    profit_factor: float
     avg_latency_ms: float
     sharpe_ratio: Optional[float]
     signals_detected: int
@@ -96,15 +100,26 @@ class MetricsCalculator:
         )
         entry_price_skipped = int(ep_row["cnt"]) if ep_row and ep_row["cnt"] else 0
 
+        win_rate = len(wins) / len(pnls) if pnls else 0.0
+        avg_win = sum(wins) / len(wins) if wins else 0.0
+        avg_loss = abs(sum(losses) / len(losses)) if losses else 0.0
+        expectancy = (win_rate * avg_win) - ((1.0 - win_rate) * avg_loss)
+        gross_loss = abs(sum(losses)) if losses else 0.0
+        profit_factor = sum(wins) / gross_loss if gross_loss > 0 else 0.0
+
         return PerformanceMetrics(
             total_trades=len(pnls),
             winning_trades=len(wins),
             losing_trades=len(losses),
-            win_rate=len(wins) / len(pnls) if pnls else 0.0,
+            win_rate=win_rate,
             total_pnl_usd=sum(pnls),
             avg_pnl_usd=sum(pnls) / len(pnls) if pnls else 0.0,
             max_win_usd=max(wins) if wins else 0.0,
             max_loss_usd=min(losses) if losses else 0.0,
+            avg_win_usd=avg_win,
+            avg_loss_usd=avg_loss,
+            expectancy_per_trade=expectancy,
+            profit_factor=profit_factor,
             avg_latency_ms=avg_lat,
             sharpe_ratio=sharpe,
             signals_detected=signals_detected,

@@ -134,6 +134,10 @@ class TelegramAlerter:
         self, date: str, total_trades: int, win_rate: float,
         total_pnl: float, avg_latency_ms: float, skipped_signals: int = 0,
         entry_price_skipped: int = 0,
+        avg_win_usd: float = 0.0,
+        avg_loss_usd: float = 0.0,
+        expectancy_per_trade: float = 0.0,
+        profit_factor: float = 0.0,
     ) -> bool:
         text = self._render(
             "daily_report",
@@ -144,5 +148,9 @@ class TelegramAlerter:
             avg_latency_ms=avg_latency_ms,
             skipped_signals=skipped_signals,
             entry_price_skipped=entry_price_skipped,
+            avg_win_usd=avg_win_usd,
+            avg_loss_usd=avg_loss_usd,
+            expectancy_per_trade=expectancy_per_trade,
+            profit_factor=profit_factor,
         )
         return await self.send_raw(text)

@@ -4,6 +4,7 @@ Long-polls getUpdates and responds to /status, /positions, /help.
 """
 from __future__ import annotations
 
+import json
 import os
 import time
 from datetime import datetime, timedelta, timezone
@@ -203,6 +204,48 @@ class TelegramCommandHandler:
             next_report += timedelta(days=1)
         hours_until = (next_report - now_utc).total_seconds() / 3600
 
+        # --- Kategorije (od 29.05.) ---
+        cat_rows = await self._db.fetchall(
+            "SELECT p.pnl_usd, m.raw_json "
+            "FROM positions p "
+            "LEFT JOIN markets m ON p.market_id = m.id "
+            "WHERE p.status = 'closed' AND p.closed_at >= ?",
+            (_CLEAN_DATA_FROM,),
+        )
+        cat_data: dict[str, dict] = {}
+        for row in cat_rows:
+            category = "other"
+            try:
+                _m = json.loads(row.get("raw_json") or "{}")
+                tags = _m.get("tags", [])
+                if isinstance(tags, list) and tags:
+                    first = tags[0]
+                    if isinstance(first, dict):
+                        category = first.get("label", "other").lower() or "other"
+                    elif isinstance(first, str):
+                        category = first.lower() or "other"
+            except Exception:
+                pass
+            pnl = float(row.get("pnl_usd") or 0)
+            entry = cat_data.setdefault(category, {"count": 0, "wins": 0, "pnl": 0.0})
+            entry["count"] += 1
+            entry["pnl"] += pnl
+            if pnl > 0:
+                entry["wins"] += 1
+
+        cat_lines = []
+        for cat, stats in sorted(cat_data.items(), key=lambda x: -x[1]["count"])[:6]:
+            wr = stats["wins"] / stats["count"] if stats["count"] > 0 else 0.0
+            pnl = stats["pnl"]
+            sign = "+" if pnl >= 0 else ""
+            cat_lines.append(
+                f"  {cat[:12]:<12} {stats['count']:>2} tr.  "
+                f"{wr * 100:>4.0f}%  {sign}{pnl:.2f} USD"
+            )
+        cat_block = (
+            "\n".join(cat_lines) if cat_lines else "  Nema podataka"
+        )
+
         # --- Uptime ---
         elapsed = int(time.time() - self._start_time)
         h, rem = divmod(elapsed, 3600)
@@ -229,6 +272,8 @@ class TelegramCommandHandler:
             f"\U0001f4e1 *Signali danas*\n"
             f"  Detektirano: *{signals_today}*\n"
             f"  Preskoceno: *{skipped_today}*  _(razlog: {skip_reason})_\n\n"
+            f"\U0001f4ca *Kategorije od {_CLEAN_DATA_LABEL}* (Kategorija | Tr | WR | P&L)\n"
+            f"{cat_block}\n\n"
             f"⏰ *Sljedeci dnevni report*: za *{hours_until:.1f}h*  (20:00 UTC)"
         )
         await self._send(msg)

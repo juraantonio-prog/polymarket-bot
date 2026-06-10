@@ -144,6 +144,14 @@ class PaperEngine:
         self._risk_guard = RiskGuard(config)
         self._db = db
 
+    @property
+    def tp_delta(self) -> float:
+        return self._tp_delta
+
+    @property
+    def sl_delta(self) -> float:
+        return self._sl_delta
+
     async def init(self) -> None:
         """Initialize risk state from DB. Call once after connecting to DB."""
         await self._risk_guard.init_from_db(self._db)

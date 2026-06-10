@@ -297,6 +297,21 @@ def run_bot(ctx: click.Context, mode: str) -> None:
                     market_volume_usd=market_vol_usd,
                 )
                 if not signal:
+                    if detector.last_skip_reason == "news_shock":
+                        direction = "fade_yes" if snap.price_change_pct > 0 else "fade_no"
+                        try:
+                            await db.execute(
+                                "INSERT INTO signals "
+                                "(market_id, direction, entry_price, confidence, "
+                                "spike_magnitude, volume_spike, days_to_expiry, skip_reason) "
+                                "VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
+                                (
+                                    market_id, direction, snap.current_price, 0.0,
+                                    abs(snap.price_change_pct), 0.0, days, "news_shock",
+                                ),
+                            )
+                        except Exception as exc:
+                            log.warning("signal.news_shock_db_failed", error=str(exc))
                     return
 
                 print(f"[SIGNAL] {signal.direction} market={market_id} mag={round(signal.spike_magnitude_pct,4)}", flush=True)
@@ -323,8 +338,9 @@ def run_bot(ctx: click.Context, mode: str) -> None:
                     raise
 
                 # Persist signal to DB so daily report can count skipped_signals
+                signal_db_id: int | None = None
                 try:
-                    await db.execute(
+                    cur = await db.execute(
                         "INSERT INTO signals "
                         "(market_id, direction, entry_price, confidence, "
                         "spike_magnitude, volume_spike, days_to_expiry) "
@@ -335,10 +351,32 @@ def run_bot(ctx: click.Context, mode: str) -> None:
                             signal.volume_spike_ratio, signal.days_to_expiry,
                         ),
                     )
+                    signal_db_id = cur.lastrowid
                 except Exception as exc:
                     log.warning("signal.db_insert_failed", error=str(exc))
 
                 print(f"[CONFIDENCE] total={round(confidence.total,4)} meets={confidence.meets_threshold}", flush=True)
+
+                # EV filter — skip trade if expected value is negative
+                from src.strategy.spike_fade import SpikeFadeDetector as _SFD
+                ev = _SFD.compute_ev(confidence.total, engine.tp_delta, engine.sl_delta)
+                if ev <= 0:
+                    log.info(
+                        "spike_fade.no_signal",
+                        market=market_id,
+                        reason="ev_negative",
+                        ev=round(ev, 4),
+                        confidence=round(confidence.total, 4),
+                    )
+                    if signal_db_id is not None:
+                        try:
+                            await db.execute(
+                                "UPDATE signals SET skip_reason = 'ev_negative' WHERE id = ?",
+                                (signal_db_id,),
+                            )
+                        except Exception as exc:
+                            log.warning("signal.ev_skip_update_failed", error=str(exc))
+                    return
 
                 try:
                     await alerter.send_signal(

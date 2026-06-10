@@ -34,6 +34,10 @@ class DailyReporter:
             "avg_pnl_usd": metrics.avg_pnl_usd,
             "max_win_usd": metrics.max_win_usd,
             "max_loss_usd": metrics.max_loss_usd,
+            "avg_win_usd": metrics.avg_win_usd,
+            "avg_loss_usd": metrics.avg_loss_usd,
+            "expectancy_per_trade": metrics.expectancy_per_trade,
+            "profit_factor": metrics.profit_factor,
             "avg_latency_ms": metrics.avg_latency_ms,
             "sharpe_ratio": metrics.sharpe_ratio,
             "signals_detected": metrics.signals_detected,
@@ -51,5 +55,9 @@ class DailyReporter:
             avg_latency_ms=metrics.avg_latency_ms,
             skipped_signals=metrics.skipped_signals,
             entry_price_skipped=metrics.entry_price_skipped,
+            avg_win_usd=metrics.avg_win_usd,
+            avg_loss_usd=metrics.avg_loss_usd,
+            expectancy_per_trade=metrics.expectancy_per_trade,
+            profit_factor=metrics.profit_factor,
         )
         return report

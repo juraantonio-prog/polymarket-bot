@@ -44,6 +44,7 @@ CREATE TABLE IF NOT EXISTS signals (
     spike_magnitude REAL,
     volume_spike REAL,
     days_to_expiry REAL,
+    skip_reason TEXT DEFAULT '',
     created_at TEXT DEFAULT (datetime('now')),
     FOREIGN KEY (market_id) REFERENCES markets(id)
 );
@@ -103,6 +104,12 @@ class Database:
         self._conn.row_factory = aiosqlite.Row
         await self._conn.executescript(SCHEMA)
         await self._conn.commit()
+        # Migration: add skip_reason column to existing signals tables
+        try:
+            await self._conn.execute("ALTER TABLE signals ADD COLUMN skip_reason TEXT DEFAULT ''")
+            await self._conn.commit()
+        except Exception:
+            pass  # column already exists
         log.info("db.connected", path=self.path)
 
     async def close(self) -> None:
