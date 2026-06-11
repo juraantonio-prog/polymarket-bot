@@ -317,14 +317,8 @@ def run_bot(ctx: click.Context, mode: str) -> None:
                 print(f"[SIGNAL] {signal.direction} market={market_id} mag={round(signal.spike_magnitude_pct,4)}", flush=True)
 
                 # Extract category from Gamma API tags for confidence scoring
-                category = ""
-                tags = _m.get("tags", [])
-                if isinstance(tags, list) and tags:
-                    first = tags[0]
-                    if isinstance(first, dict):
-                        category = first.get("label", "").lower()
-                    elif isinstance(first, str):
-                        category = first.lower()
+                from src.data.gamma_client import resolve_market_category
+                category = resolve_market_category(_m)
 
                 try:
                     confidence = scorer.score(

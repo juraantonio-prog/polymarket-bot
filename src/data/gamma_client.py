@@ -15,6 +15,99 @@ from src.logger import get_logger
 
 log = get_logger(__name__)
 
+# Categories that match exactly in strategy.yaml category_weights
+_CANONICAL: frozenset[str] = frozenset({
+    "politics", "elections", "geopolitics", "macro", "finance", "economics",
+    "business", "law", "legal", "health", "ai", "science", "technology", "tech",
+    "climate", "world", "news", "crypto", "sports", "other",
+})
+
+# Substring keywords → canonical category (checked in order; first match wins)
+_KEYWORD_MAP: list[tuple[str, str]] = [
+    # crypto — check before finance so "crypto markets" → crypto not finance
+    ("bitcoin", "crypto"), ("ethereum", "crypto"), ("defi", "crypto"),
+    ("blockchain", "crypto"), ("cryptocurrency", "crypto"), ("web3", "crypto"),
+    # sports
+    ("nfl", "sports"), ("nba", "sports"), ("mlb", "sports"), ("nhl", "sports"),
+    ("soccer", "sports"), ("football", "sports"), ("basketball", "sports"),
+    ("baseball", "sports"), ("tennis", "sports"), ("golf", "sports"),
+    ("boxing", "sports"), ("hockey", "sports"), ("ufc", "sports"),
+    ("esport", "sports"), ("racing", "sports"),
+    # elections before politics so "us elections" → elections
+    ("election", "elections"), ("voting", "elections"), ("ballot", "elections"),
+    ("midterm", "elections"), ("primary", "elections"),
+    # geopolitics
+    ("geopolit", "geopolitics"), ("nato", "geopolitics"),
+    ("war ", "geopolitics"), ("nuclear", "geopolitics"), ("sanction", "geopolitics"),
+    # politics
+    ("politic", "politics"), ("congress", "politics"), ("senate", "politics"),
+    ("president", "politics"), ("democrat", "politics"), ("republican", "politics"),
+    # macro
+    ("interest rate", "macro"), ("central bank", "macro"), ("monetary", "macro"),
+    ("inflation", "macro"), ("recession", "macro"), ("gdp", "macro"),
+    # finance / economics
+    ("stock market", "finance"), ("equit", "finance"), ("ipo", "finance"),
+    ("bond market", "finance"), ("commodit", "finance"),
+    ("tariff", "economics"), ("trade war", "economics"),
+    # ai
+    ("artificial intelligence", "ai"), ("machine learning", "ai"),
+    ("chatgpt", "ai"), ("openai", "ai"), ("llm", "ai"),
+    # health
+    ("pandemic", "health"), ("vaccine", "health"), ("disease", "health"),
+    ("covid", "health"), ("fda", "health"), ("drug", "health"),
+    # law
+    ("supreme court", "law"), ("trial", "law"), ("verdict", "law"),
+    ("indictment", "law"), ("lawsuit", "law"),
+    # science / climate / tech
+    ("climate change", "climate"), ("global warming", "climate"),
+    ("nasa", "science"), ("space", "science"),
+    ("silicon valley", "technology"), ("software", "technology"),
+]
+
+
+def resolve_market_category(market: dict) -> str:
+    """
+    Derive a canonical category string from a raw Gamma API market dict.
+
+    Strategy:
+    1. Collect all candidate strings: market["category"] + all tag labels.
+    2. Exact match against _CANONICAL set (fastest path).
+    3. Substring match via _KEYWORD_MAP.
+    4. Fall back to "other".
+    """
+    candidates: list[str] = []
+
+    top = (market.get("category") or "").strip()
+    if top:
+        candidates.append(top.lower())
+
+    for t in market.get("tags", []):
+        if isinstance(t, dict):
+            label = (t.get("label") or t.get("slug") or "").strip()
+        else:
+            label = str(t).strip()
+        if label:
+            candidates.append(label.lower())
+
+    # Pass 1 — exact canonical match
+    for c in candidates:
+        if c in _CANONICAL:
+            return c
+
+    # Pass 2 — normalize hyphens/underscores and retry exact match
+    for c in candidates:
+        normalized = c.replace("-", " ").replace("_", " ")
+        if normalized in _CANONICAL:
+            return normalized
+
+    # Pass 3 — keyword substring match across all candidates joined
+    combined = " ".join(candidates)
+    for keyword, category in _KEYWORD_MAP:
+        if keyword in combined:
+            return category
+
+    return "other"
+
 
 class GammaClient:
     """Async HTTP client for the Polymarket Gamma API."""

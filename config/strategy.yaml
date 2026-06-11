@@ -45,6 +45,8 @@ category_weights:
   world: 0.60
   news: 0.55
   other: 0.50
+  crypto: 0.30
+  sports: 0.10
 
 # Per-category priority [0..10] — maps to market_priority score via priority / 10.0
 category_priorities:
@@ -66,6 +68,8 @@ category_priorities:
   world: 5
   news: 4
   other: 4
+  crypto: 2
+  sports: 1
 
 # Time-to-expiry filter
 expiry:
